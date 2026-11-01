@@ -6,7 +6,7 @@ This repository is a public portfolio record of a completed, synthetic AWS relia
 
 It does not operate a live service, a supported product, a public endpoint or an AWS account. The lab environment was destroyed after the recorded exercises. No credentials, private keys, kubeconfigs, Terraform state or account-specific configuration are published.
 
-The controls exercised in the lab and its known findings are described in [`docs/SECURITY.md`](../docs/SECURITY.md).
+The controls exercised in the lab and its known findings are described in [`docs/SECURITY.md`](https://github.com/koatedevopskpai/galland-aws-sre-proof/blob/main/docs/SECURITY.md).
 
 ## Reporting a vulnerability
 
