@@ -1,0 +1,32 @@
+---
+- name: Apply metadata-only Secret auditing one API server at a time
+  hosts: rke2_servers
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Install the corrected audit policy
+      ansible.builtin.copy:
+        src: /home/ubuntu/aws-sre-proof/ansible/roles/rke2_server/templates/audit-policy.yaml.j2
+        dest: /etc/rancher/rke2/audit-policy.yaml
+        owner: root
+        group: root
+        mode: "0600"
+    - name: Identify exactly one API-server container
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/crictl --runtime-endpoint unix:///run/k3s/containerd/containerd.sock ps -q --name kube-apiserver
+      register: api_container
+      changed_when: false
+    - name: Assert one intended container
+      ansible.builtin.assert:
+        that:
+          - api_container.stdout_lines | length == 1
+    - name: Restart the API container to load its policy file
+      ansible.builtin.command: "/var/lib/rancher/rke2/bin/crictl --runtime-endpoint unix:///run/k3s/containerd/containerd.sock stop {{ api_container.stdout | trim }}"
+    - name: Wait for the selected local API to return
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /readyz
+      register: ready
+      until: ready.rc == 0
+      retries: 60
+      delay: 5
+      changed_when: false

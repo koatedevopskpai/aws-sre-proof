@@ -1,0 +1,126 @@
+---
+- name: Install the API server audit policy
+  ansible.builtin.template:
+    src: audit-policy.yaml.j2
+    dest: "{{ rke2_config_dir }}/audit-policy.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Install the cluster-wide Pod Security Admission defaults
+  ansible.builtin.template:
+    src: pod-security.yaml.j2
+    dest: "{{ rke2_config_dir }}/pod-security.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Write the server configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ rke2_config_dir }}/config.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: restart rke2 server
+
+- name: Bootstrap Cilium service translation before waiting for the first node
+  ansible.builtin.copy:
+    dest: /var/lib/rancher/rke2/server/manifests/rke2-cilium-config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChartConfig
+      metadata:
+        name: rke2-cilium
+        namespace: kube-system
+      spec:
+        valuesContent: |-
+          kubeProxyReplacement: true
+          k8sServiceHost: {{ hostvars[groups['rke2_servers'][0]].private_ip }}
+          k8sServicePort: 6443
+          bpf:
+            masquerade: true
+          operator:
+            tolerations:
+              - operator: Exists
+  when: rke2_first_server
+
+- name: Enable and start the RKE2 server without blocking on image import
+  ansible.builtin.command:
+    cmd: systemctl enable --now --no-block rke2-server
+  register: rke2_enable
+  changed_when: "'Created symlink' in rke2_enable.stderr or rke2_enable.rc == 0"
+  when: not (rke2_skip_start | default(false))
+
+- name: Wait for the supervisor port
+  ansible.builtin.wait_for:
+    host: "{{ private_ip }}"
+    port: 9345
+    delay: 5
+    timeout: 900
+  when: not (rke2_skip_start | default(false))
+
+- name: Wait for the API server
+  ansible.builtin.wait_for:
+    host: "{{ private_ip }}"
+    port: 6443
+    delay: 5
+    timeout: 900
+  when: not (rke2_skip_start | default(false))
+
+- name: Wait for the first server to mint the cluster token
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/rke2/server/node-token
+    timeout: 900
+  when:
+    - rke2_first_server
+    - not (rke2_skip_start | default(false))
+
+- name: Wait for the API server to report ready
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      get --raw /readyz
+  register: api_ready
+  retries: 90
+  delay: 10
+  until: api_ready.rc == 0
+  changed_when: false
+  when: not (rke2_skip_start | default(false))
+
+- name: Record the secrets-encryption status for the evidence pack
+  ansible.builtin.command: /usr/local/bin/rke2 secrets-encrypt status
+  register: secrets_status
+  retries: 30
+  delay: 10
+  until: secrets_status.rc == 0
+  changed_when: false
+  failed_when: secrets_status.rc != 0
+  when: not (rke2_skip_start | default(false))
+
+- name: Assert the control plane is encrypting secrets at rest
+  ansible.builtin.assert:
+    that:
+      - "'Encryption Status: Enabled' in secrets_status.stdout"
+    fail_msg: "Secrets encryption is not enabled: {{ secrets_status.stdout }}"
+    quiet: true
+  when: not (rke2_skip_start | default(false))
+
+- name: Wait for the node to become Ready
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      get node {{ inventory_hostname }}
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_status
+  retries: 60
+  delay: 10
+  until: node_status.stdout == "True"
+  changed_when: false
+  when: not (rke2_skip_start | default(false))

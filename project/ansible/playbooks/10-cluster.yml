@@ -1,0 +1,81 @@
+---
+# The first server bootstraps etcd and mints the cluster token. Every other
+# node registers through the fixed registration address, so no node needs to
+# know which server it happened to contact.
+- name: Bootstrap the first control-plane node
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: rke2_common
+    - role: rke2_server
+      vars:
+        rke2_first_server: true
+        rke2_token: ""
+
+  post_tasks:
+    - name: Read the cluster token minted by the first server
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/rke2/server/node-token
+      register: rke2_token_raw
+      no_log: true
+
+    - name: Publish the token to later plays
+      ansible.builtin.set_fact:
+        rke2_token: "{{ rke2_token_raw.content | b64decode | trim }}"
+      no_log: true
+
+    - name: Confirm the local API server is answering
+      ansible.builtin.command:
+        cmd: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /readyz
+      register: readyz
+      retries: 30
+      delay: 10
+      until: readyz.rc == 0
+      changed_when: false
+
+- name: Join the remaining control-plane nodes one at a time
+  hosts: rke2_servers[1:]
+  become: true
+  gather_facts: true
+  serial: 1
+
+  roles:
+    - role: rke2_common
+    - role: rke2_server
+      vars:
+        rke2_first_server: false
+        rke2_token: "{{ hostvars[groups['rke2_servers'][0]].rke2_token }}"
+
+- name: Join worker nodes
+  hosts: rke2_agents
+  become: true
+  gather_facts: true
+  serial: 2
+
+  roles:
+    - role: rke2_common
+    - role: rke2_agent
+      vars:
+        rke2_token: "{{ hostvars[groups['rke2_servers'][0]].rke2_token }}"
+
+- name: Confirm the full cluster is Ready
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Wait for every node to report Ready
+      ansible.builtin.command:
+        cmd: >-
+          /var/lib/rancher/rke2/bin/kubectl
+          --kubeconfig /etc/rancher/rke2/rke2.yaml
+          get nodes -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}'
+      register: node_ready
+      retries: 40
+      delay: 10
+      until: >-
+        node_ready.stdout.split() | select('equalto', 'True') | list | length ==
+        (groups['rke2_servers'] | length + groups['rke2_agents'] | length)
+      changed_when: false

@@ -1,0 +1,50 @@
+all:
+  vars:
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: "${ssh_key_path}"
+    ansible_python_interpreter: /usr/bin/python3
+    lab_project: "${project}"
+    lab_region: "${region}"
+    lab_cluster_name: "${cluster_name}"
+    lab_api_endpoint: "${api_endpoint}"
+    lab_registration_endpoint: "${registration_endpoint}"
+    lab_nlb_dns: "${nlb_dns_name}"
+    lab_private_dns_zone: "${private_dns_zone}"
+    lab_api_host: "api.${private_dns_zone}"
+    lab_registration_host: "register.${private_dns_zone}"
+    lab_bucket: "${bucket}"
+    lab_backup_bucket: "${backup_bucket}"
+    lab_admin_cidr: "${admin_cidr}"
+    lab_vpc_cidr: "${vpc_cidr}"
+    lab_cluster_cidr: "${cluster_cidr}"
+    lab_service_cidr: "${service_cidr}"
+    lab_rke2_version: "${rke2_version}"
+    lab_aws_account: "${account_id}"
+  children:
+    bastion:
+      hosts:
+        ${project}-bastion:
+          ansible_host: "${bastion_public_ip}"
+          private_ip: "${bastion_private_ip}"
+          zone: "${bastion_zone}"
+    rke2_servers:
+      vars:
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=yes -o ProxyCommand=\"ssh -o StrictHostKeyChecking=yes -i ${ssh_key_path} -W %h:%p ubuntu@${bastion_public_ip}\""
+      hosts:
+%{ for name, node in servers ~}
+        ${name}:
+          ansible_host: "${node.private_ip}"
+          private_ip: "${node.private_ip}"
+          zone: "${node.zone}"
+%{ endfor ~}
+    rke2_agents:
+      vars:
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=yes -o ProxyCommand=\"ssh -o StrictHostKeyChecking=yes -i ${ssh_key_path} -W %h:%p ubuntu@${bastion_public_ip}\""
+      hosts:
+%{ for name, node in agents ~}
+        ${name}:
+          ansible_host: "${node.private_ip}"
+          private_ip: "${node.private_ip}"
+          zone: "${node.zone}"
+%{ endfor ~}
+

@@ -1,0 +1,303 @@
+---
+- name: Assert supported operating system and architecture
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_major_version | int >= 24
+      - ansible_architecture == "x86_64"
+    fail_msg: "This lab targets Ubuntu 24.04+ on amd64; found {{ ansible_distribution }} {{ ansible_distribution_version }} {{ ansible_architecture }}"
+    quiet: true
+
+- name: Create configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/ssh/sshd_config.d
+    - /etc/audit/rules.d
+    - /etc/systemd/journald.conf.d
+    - /etc/apt/apt.conf.d
+    - /etc/security/limits.d
+    - /etc/rancher/rke2
+    - /var/lib/rancher/rke2
+
+- name: Install baseline packages
+  ansible.builtin.apt:
+    name: "{{ baseline_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 600
+
+- name: Set the system timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Point chrony at the Amazon Time Sync service
+  ansible.builtin.template:
+    src: chrony-lab.conf.j2
+    dest: /etc/chrony/conf.d/lab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart chrony
+
+- name: Check whether systemd-timesyncd is present
+  ansible.builtin.stat:
+    path: /lib/systemd/system/systemd-timesyncd.service
+  register: timesyncd_unit
+
+- name: Disable systemd-timesyncd so only one time daemon owns the clock
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: false
+    masked: true
+  when: timesyncd_unit.stat.exists
+
+- name: Enable chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: started
+    enabled: true
+
+- name: Disable swap immediately
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+  failed_when: false
+
+- name: Remove swap entries from fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# disabled by platform-lab: \1'
+
+- name: Load kernel modules required by Kubernetes and Cilium
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/90-kubernetes.conf
+    mode: "0644"
+    content: |
+      br_netfilter
+      overlay
+      nf_conntrack
+      ip_tables
+      iptable_nat
+      iptable_filter
+      iptable_mangle
+
+- name: Load modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - overlay
+    - nf_conntrack
+    - ip_tables
+    - iptable_nat
+    - iptable_filter
+    - iptable_mangle
+
+- name: Apply Kubernetes kernel tunables
+  ansible.builtin.template:
+    src: 90-kubernetes.conf.j2
+    dest: /etc/sysctl.d/90-kubernetes.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload sysctl
+
+- name: Apply security kernel tunables
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-security.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by platform-lab Ansible.
+      kernel.dmesg_restrict = 1
+      kernel.kptr_restrict = 2
+      kernel.yama.ptrace_scope = 1
+      fs.suid_dumpable = 0
+      fs.protected_hardlinks = 1
+      fs.protected_symlinks = 1
+      net.ipv4.tcp_syncookies = 1
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv6.conf.all.accept_redirects = 0
+  notify: reload sysctl
+
+- name: Apply kernel tunables immediately
+  # The notify handler alone proved insufficient on the first AWS boot: the
+  # files were written but kubelet still saw the distribution defaults and
+  # refused to start. Apply them in the same role run, then let the handler
+  # remain as the idempotent follow-up.
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+
+- name: Blacklist unnecessary filesystems and protocols
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/99-platform-blacklist.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by platform-lab Ansible. squashfs is intentionally kept
+      # because Ubuntu cloud images use it for snap mounts.
+      install cramfs /bin/false
+      install freevxfs /bin/false
+      install jffs2 /bin/false
+      install hfs /bin/false
+      install hfsplus /bin/false
+      install udf /bin/false
+      install dccp /bin/false
+      install sctp /bin/false
+      install rds /bin/false
+      install tipc /bin/false
+      blacklist cramfs
+      blacklist freevxfs
+      blacklist jffs2
+      blacklist hfs
+      blacklist hfsplus
+      blacklist udf
+      blacklist dccp
+      blacklist sctp
+      blacklist rds
+      blacklist tipc
+
+- name: Constrain journald disk usage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/90-platform.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Journal]
+      Storage=persistent
+      SystemMaxUse=512M
+      RuntimeMaxUse=64M
+      MaxRetentionSec=14day
+      ForwardToSyslog=yes
+  notify: restart journald
+
+- name: Install the SSH policy drop-in
+  ansible.builtin.template:
+    src: 99-platform-sshd.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-platform.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: restart sshd
+
+- name: Install the login banner
+  ansible.builtin.template:
+    src: issue.net.j2
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install auditd rules
+  ansible.builtin.template:
+    src: 50-platform-audit.rules.j2
+    dest: /etc/audit/rules.d/50-platform.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: reload audit rules
+
+- name: Bound the audit log
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^{{ item.key }}\\s*="
+    line: "{{ item.key }} = {{ item.value }}"
+    state: present
+  loop:
+    - { key: max_log_file, value: "32" }
+    - { key: num_logs, value: "5" }
+    - { key: max_log_file_action, value: "ROTATE" }
+    - { key: space_left_action, value: "SYSLOG" }
+    - { key: admin_space_left_action, value: "SYSLOG" }
+    - { key: disk_full_action, value: "SYSLOG" }
+    - { key: disk_error_action, value: "SYSLOG" }
+  notify: restart auditd
+
+- name: Enable and start auditd
+  ansible.builtin.systemd:
+    name: auditd
+    state: started
+    enabled: true
+
+- name: Install the host firewall policy
+  ansible.builtin.template:
+    src: nftables.conf.j2
+    dest: /etc/nftables.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/nft -c -f %s
+  notify: reload nftables
+
+- name: Enable the host firewall
+  ansible.builtin.systemd:
+    name: nftables
+    state: started
+    enabled: true
+
+- name: Configure unattended security upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/51unattended-upgrades-platform
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      // Managed by platform-lab Ansible.
+      Unattended-Upgrade::Allowed-Origins {
+          "{{ '${distro_id}:${distro_codename}-security' }}";
+          "{{ '${distro_id}ESMApps:${distro_codename}-apps-security' }}";
+          "{{ '${distro_id}ESM:${distro_codename}-infra-security' }}";
+      };
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
+      Unattended-Upgrade::Remove-Unused-Dependencies "false";
+
+- name: Enable the unattended-upgrades timer
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+- name: Disable core dumps for interactive sessions
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/99-platform.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      *  hard  core  0
+      *  soft  core  0
+
+- name: Record the applied baseline for the evidence pack
+  ansible.builtin.copy:
+    dest: /etc/platform-lab-baseline.txt
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      role: host_baseline
+      applied_by: ansible
+      cluster: {{ lab_cluster_name }}
+      host: {{ inventory_hostname }}
+      zone: {{ zone | default('n/a') }}
+      ubuntu: {{ ansible_distribution_version }}
+      kernel: {{ ansible_kernel }}
+      timezone: {{ timezone }}

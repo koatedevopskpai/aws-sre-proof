@@ -1,0 +1,12 @@
+.terraform/
+.build/
+.secrets/
+.private/
+__pycache__/
+*.pyc
+*.tfstate*
+*.tfplan
+session*.json
+backend.local.hcl
+ansible/inventory/
+rendered-k8s/

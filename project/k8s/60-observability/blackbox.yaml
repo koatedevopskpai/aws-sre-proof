@@ -1,0 +1,190 @@
+# ---------------------------------------------------------------------------
+# Blackbox probing closes the gap that a TCP health check leaves open: the
+# API being reachable is not the same as the API answering, and the serving
+# certificate can expire while every pod is Ready.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-exporter
+  namespace: platform-system
+data:
+  blackbox.yaml: |
+    modules:
+      http_2xx:
+        prober: http
+        timeout: 5s
+        http:
+          preferred_ip_protocol: ip4
+          valid_status_codes: [200]
+          tls_config:
+            insecure_skip_verify: true
+      tcp_connect:
+        prober: tcp
+        timeout: 5s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+  namespace: platform-system
+  labels:
+    app.kubernetes.io/name: blackbox-exporter
+    app.kubernetes.io/part-of: platform-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: blackbox-exporter
+        app.kubernetes.io/part-of: platform-lab
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: blackbox-exporter
+          image: quay.io/prometheus/blackbox-exporter:v0.27.0
+          args:
+            - --config.file=/etc/blackbox/blackbox.yaml
+            - --web.listen-address=:9115
+          ports:
+            - {name: http, containerPort: 9115}
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/blackbox
+      volumes:
+        - name: config
+          configMap:
+            name: blackbox-exporter
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox-exporter
+  namespace: platform-system
+  labels:
+    app.kubernetes.io/name: blackbox-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: blackbox-exporter
+  ports:
+    - {name: http, port: 9115, targetPort: http}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: blackbox-exporter
+  namespace: platform-system
+  labels:
+    platform.lab/managed: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: blackbox-exporter
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: kubernetes-api
+  namespace: platform-system
+  labels:
+    platform.lab/managed: "true"
+spec:
+  jobName: kubernetes-api
+  interval: 30s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter.platform-system.svc.cluster.local:9115
+    path: /probe
+  targets:
+    staticConfig:
+      static:
+        - https://kubernetes.default.svc:443/healthz
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-lab-alerts
+  namespace: platform-system
+  labels:
+    platform.lab/managed: "true"
+spec:
+  groups:
+    - name: platform-lab.rules
+      rules:
+        - alert: PlatformApiProbeFailing
+          expr: probe_success{job="kubernetes-api"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kubernetes API probe is failing"
+            description: "Blackbox cannot get a 200 from the API health endpoint for 2 minutes."
+
+        - alert: PlatformApiCertificateExpiringSoon
+          expr: (probe_ssl_earliest_cert_expiry{job="kubernetes-api"} - time()) < 30 * 24 * 3600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kubernetes API certificate expires within 30 days"
+            description: "Remaining: {{ $value | humanizeDuration }}. Rotate the serving certificate."
+
+        - alert: PlatformNodeNotReady
+          expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} is NotReady"
+            description: "A node has been NotReady for 5 minutes. Check kubelet and the container runtime."
+
+        - alert: PlatformPodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"tenant-.*"}[10m]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is restarting"
+            description: "More than three restarts in ten minutes."
+
+        - alert: PlatformPersistentVolumeError
+          expr: kube_persistentvolume_status_phase{phase=~"Failed|Pending"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Persistent volume {{ $labels.persistentvolume }} is {{ $labels.phase }}"
+            description: "Storage is not binding. Check the CSI controller and the node."
+
+        - alert: PlatformContainerOOMKilled
+          expr: increase(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[15m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Container {{ $labels.container }} in {{ $labels.namespace }} was OOMKilled"
+            description: "The limit is too low or the workload leaked memory."

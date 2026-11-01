@@ -1,0 +1,6 @@
+configs:
+  "{{ rke2_registry_host }}":
+    auth:
+      username: _json_key
+      password: |
+{{ lookup('file', rke2_puller_key_path) | trim | indent(8, true) }}

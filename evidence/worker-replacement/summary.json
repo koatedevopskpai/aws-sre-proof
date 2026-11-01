@@ -1,0 +1,9 @@
+{
+  "attempts": 600,
+  "accepted": 600,
+  "errors": 0,
+  "availability": 1.0,
+  "p95_attempt_latency_ms": 48.598,
+  "under_one_second_and_accepted": 600,
+  "scope": "Bounded client observations; includes timeouts/errors, not a monthly SLO."
+}

@@ -1,0 +1,104 @@
+---
+# Capture the recovery set before a full cluster loss: a state marker, an
+# embedded-etcd snapshot, and the cluster token. The application database is
+# backed up separately because etcd does not contain PVC bytes.
+- name: Prepare the full-disaster recovery set
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    lab_kubectl: /var/lib/rancher/rke2/bin/kubectl
+  tasks:
+    - name: Require explicit disruption authorisation
+      ansible.builtin.assert:
+        that:
+          - lab_allow_disruption | default(false) | bool
+          - lab_exercise_id is match('^[a-z0-9-]+$')
+          - recovery_dir is defined
+
+    - name: Remove any previous marker
+      ansible.builtin.command:
+        argv: ["{{ lab_kubectl }}", --kubeconfig, /etc/rancher/rke2/rke2.yaml, -n, tenant-probe,
+               delete, configmap, dr-marker, --ignore-not-found]
+      changed_when: true
+
+    - name: Write the pre-disaster marker
+      ansible.builtin.command:
+        argv: ["{{ lab_kubectl }}", --kubeconfig, /etc/rancher/rke2/rke2.yaml, -n, tenant-probe,
+               create, configmap, dr-marker, "--from-literal=state=pre-disaster",
+               "--from-literal=run_id={{ lab_exercise_id }}"]
+      changed_when: true
+
+    - name: Remove older disaster snapshots
+      ansible.builtin.shell:
+        cmd: "rm -f /var/lib/rancher/rke2/server/db/snapshots/dr-{{ lab_exercise_id }}-*.zip"
+      changed_when: true
+
+    - name: Save a fresh embedded-etcd snapshot
+      ansible.builtin.command:
+        argv: [/usr/local/bin/rke2, etcd-snapshot, save, "--name=dr-{{ lab_exercise_id }}"]
+      changed_when: true
+
+    - name: Locate the snapshot
+      ansible.builtin.find:
+        paths: /var/lib/rancher/rke2/server/db/snapshots
+        patterns: "dr-{{ lab_exercise_id }}-*.zip"
+        file_type: file
+      register: dr_snapshots
+
+    - name: Require exactly one snapshot
+      ansible.builtin.assert:
+        that: dr_snapshots.matched == 1
+
+    - name: Keep the selected snapshot path
+      ansible.builtin.set_fact:
+        dr_snapshot_path: "{{ dr_snapshots.files[0].path }}"
+
+    - name: Create the local recovery directory
+      ansible.builtin.file:
+        path: "{{ recovery_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Copy the snapshot off the cluster
+      ansible.builtin.fetch:
+        src: "{{ dr_snapshot_path }}"
+        dest: "{{ recovery_dir }}/etcd.zip"
+        flat: true
+      no_log: true
+
+    - name: Copy the cluster token
+      ansible.builtin.fetch:
+        src: /var/lib/rancher/rke2/server/node-token
+        dest: "{{ recovery_dir }}/node-token"
+        flat: true
+      no_log: true
+
+    - name: Restrict local recovery files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: "0600"
+      loop:
+        - "{{ recovery_dir }}/etcd.zip"
+        - "{{ recovery_dir }}/node-token"
+      delegate_to: localhost
+      become: false
+
+    - name: Record the recovery set
+      ansible.builtin.copy:
+        dest: "{{ recovery_dir }}/prepare.json"
+        mode: "0600"
+        content: |
+          {
+            "run_id": "{{ lab_exercise_id }}",
+            "prepared_at": "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}",
+            "snapshot": "{{ dr_snapshot_path }}",
+            "snapshot_bytes": {{ dr_snapshots.files[0].size }},
+            "marker": "dr-marker",
+            "marker_state": "pre-disaster"
+          }
+      delegate_to: localhost
+      become: false

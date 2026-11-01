@@ -1,0 +1,17 @@
+node-name: {{ inventory_hostname }}
+node-ip: {{ private_ip }}
+data-dir: /var/lib/rancher/rke2
+# Agents join through server 1 directly. The NLB is for the operator-facing API
+# and for registration from outside the VPC; a private-subnet agent reaching the
+# internet-facing NLB would otherwise hairpin through NAT and be denied.
+server: https://{{ hostvars[groups['rke2_servers'][0]].private_ip }}:9345
+token: "{{ rke2_token }}"
+
+protect-kernel-defaults: true
+
+kubelet-arg:
+  - "max-pods=110"
+
+node-label:
+  - "platform.lab/role=worker"
+  - "topology.kubernetes.io/zone={{ zone }}"

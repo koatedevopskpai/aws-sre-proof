@@ -1,0 +1,49 @@
+# A cluster-wide policy with endpointSelector: {} selects every endpoint and
+# creates an unintended default-deny for all other traffic (including CoreDNS
+# and Cilium health). These namespace-scoped policies allow kubelet health
+# probes only where the chart components need them.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-health-probes
+  namespace: platform-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+        - world
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP
+            - port: "8081"
+              protocol: TCP
+            - port: "9090"
+              protocol: TCP
+            - port: "9093"
+              protocol: TCP
+            - port: "10254"
+              protocol: TCP
+            - port: "13133"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-health-probes
+  namespace: siem
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+        - world
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP

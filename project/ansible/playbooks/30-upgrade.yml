@@ -1,0 +1,138 @@
+---
+# Same-minor patch upgrade only. Invoke with explicit inventory and verified target.
+- name: Upgrade servers one at a time
+  hosts: rke2_servers
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  vars:
+    lab_rke2_version: "{{ target_rke2_version }}"
+    rke2_allow_version_change: true
+    lifecycle_service: rke2-server
+  pre_tasks:
+    - name: Require explicit lifecycle authorisation
+      ansible.builtin.assert:
+        that:
+          - upgrade_authorised | default(false) | bool
+          - target_rke2_version is match('^v[0-9]+\.[0-9]+\.[0-9]+\+rke2r[0-9]+$')
+        fail_msg: Review baseline, release pair, snapshot and observer before authorising this play.
+    - name: Read the current binary version
+      ansible.builtin.command: /usr/local/bin/rke2 --version
+      register: upgrade_before
+      changed_when: false
+    - name: Restrict this play to the current Kubernetes minor
+      ansible.builtin.assert:
+        that:
+          - (upgrade_before.stdout | regex_search('v[0-9]+\.[0-9]+')) == (target_rke2_version | regex_search('v[0-9]+\.[0-9]+'))
+          - (target_rke2_version.split('.')[2].split('+')[0] | int) >= ((upgrade_before.stdout | regex_search('v[0-9]+\.[0-9]+\.([0-9]+)', '\\1') | first) | int)
+        fail_msg: Minor-version migration or binary downgrade requires a separately reviewed recovery procedure.
+    - name: Check API and etcd health before this server
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /healthz/etcd
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      changed_when: false
+    - name: Take the pre-upgrade embedded-etcd snapshot on the first server
+      ansible.builtin.command: /usr/local/bin/rke2 etcd-snapshot save --name galland-before-patch-upgrade
+      when: inventory_hostname == groups['rke2_servers'][0]
+    - name: Drain this server without overriding eviction safeguards
+      ansible.builtin.command:
+        argv: "{{ ['/var/lib/rancher/rke2/bin/kubectl', '--kubeconfig', '/etc/rancher/rke2/rke2.yaml', 'drain', inventory_hostname, '--ignore-daemonsets', '--timeout=300s'] + (['--delete-emptydir-data'] if upgrade_allow_emptydir_loss | default(false) | bool else []) }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+  roles:
+    - rke2_common
+  post_tasks:
+    - name: Start the updated service
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: restarted
+        daemon_reload: true
+    - name: Wait for the API after this server
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /readyz
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: upgrade_ready
+      retries: 60
+      delay: 10
+      until: upgrade_ready.rc == 0
+      changed_when: false
+    - name: Wait for the target node version and Ready condition
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - get
+          - node
+          - "{{ inventory_hostname }}"
+          - -o
+          - json
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: upgraded_node
+      retries: 60
+      delay: 10
+      until:
+        - upgraded_node.rc == 0
+        - (upgraded_node.stdout | from_json).status.nodeInfo.kubeletVersion == target_rke2_version
+        - ((upgraded_node.stdout | from_json).status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) == 'True'
+      changed_when: false
+    - name: Uncordon only the successfully verified server
+      ansible.builtin.command: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml uncordon {{ inventory_hostname }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+- name: Upgrade agents one at a time after all servers
+  hosts: rke2_agents
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  vars:
+    lab_rke2_version: "{{ target_rke2_version }}"
+    rke2_allow_version_change: true
+  pre_tasks:
+    - name: Require explicit authorisation and server completion
+      ansible.builtin.assert:
+        that:
+          - upgrade_authorised | default(false) | bool
+          - target_rke2_version is match('^v[0-9]+\.[0-9]+\.[0-9]+\+rke2r[0-9]+$')
+    - name: Read all server node versions
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -l node-role.kubernetes.io/control-plane -o json
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: server_versions
+      changed_when: false
+    - name: Require three upgraded servers
+      ansible.builtin.assert:
+        that:
+          - (server_versions.stdout | from_json)['items'] | length == 3
+          - ((server_versions.stdout | from_json)['items'] | map(attribute='status.nodeInfo.kubeletVersion') | unique | list) == [target_rke2_version]
+    - name: Read agent version
+      ansible.builtin.command: /usr/local/bin/rke2 --version
+      register: agent_before
+      changed_when: false
+    - name: Restrict agents to the same minor
+      ansible.builtin.assert:
+        that:
+          - (agent_before.stdout | regex_search('v[0-9]+\.[0-9]+')) == (target_rke2_version | regex_search('v[0-9]+\.[0-9]+'))
+    - name: Drain this agent
+      ansible.builtin.command: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml drain {{ inventory_hostname }} --ignore-daemonsets --timeout=300s {{ '--delete-emptydir-data' if upgrade_allow_emptydir_loss | default(false) | bool else '' }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+  roles:
+    - rke2_common
+  post_tasks:
+    - name: Start the updated agent
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: restarted
+        daemon_reload: true
+    - name: Wait for agent readiness and target version
+      ansible.builtin.command: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get node {{ inventory_hostname }} -o json"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: agent_after
+      retries: 60
+      delay: 10
+      until:
+        - agent_after.rc == 0
+        - (agent_after.stdout | from_json).status.nodeInfo.kubeletVersion == target_rke2_version
+        - ((agent_after.stdout | from_json).status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) == 'True'
+      changed_when: false
+    - name: Uncordon the verified agent
+      ansible.builtin.command: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml uncordon {{ inventory_hostname }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"

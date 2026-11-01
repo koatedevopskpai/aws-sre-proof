@@ -1,0 +1,42 @@
+# Credentials and private operational material
+.env
+.env.*
+.secrets/
+.private/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+kubeconfig*
+*.kubeconfig
+
+# Terraform state, plans and real variables
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+terraform.tfvars
+*.tfvars
+backend.local.hcl
+.terraform/
+
+# Generated session and rendered manifests
+session*.json
+!evidence/final/session-results.json
+rendered-k8s/
+ansible/inventory/
+.build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local evidence and runtime output
+run-evidence/
+evidence/private/
+*.log
+!evidence/**/*.log
+!docs/**/*.log

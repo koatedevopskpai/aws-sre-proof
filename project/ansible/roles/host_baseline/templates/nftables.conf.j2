@@ -1,0 +1,76 @@
+#!/usr/sbin/nft -f
+# Managed by platform-lab Ansible.
+#
+# This is a separate table, not a `flush ruleset`. Flushing the whole ruleset
+# would delete the iptables-nft rules that Cilium installs and break service
+# networking on the next firewall reload.
+add table inet platform_filter
+delete table inet platform_filter
+
+table inet platform_filter {
+    set admin_nets {
+        type ipv4_addr
+        flags interval
+        elements = { {{ nft_ssh_sources | join(', ') }} }
+    }
+
+    set cluster_nets {
+        type ipv4_addr
+        flags interval
+        elements = { {{ nft_cluster_sources | join(', ') }} }
+    }
+
+    set health_nets {
+        type ipv4_addr
+        flags interval
+        elements = { {{ nft_health_check_sources | join(', ') }} }
+    }
+
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        iif "lo" accept
+        ct state established,related accept
+        ct state invalid drop
+
+        # ICMP is needed for PMTU discovery; blocking it breaks large TLS
+        # handshakes in subtle ways.
+        ip protocol icmp accept
+        ip6 nexthdr ipv6-icmp accept
+
+        # DHCP lease renewal from the AWS subnet.
+        udp sport 67 udp dport 68 accept
+
+        # Administrative SSH. The bastion is the normal entry point.
+        tcp dport 22 ip saddr @admin_nets accept
+{% if not nft_is_bastion %}
+        tcp dport 22 ip saddr @cluster_nets accept
+
+        # Node-to-node and metrics ports. The host-networked OTel Collector
+        # and Fluent Bit expose their local endpoints on these ports.
+        tcp dport { 10250, 9100, 4240, 4244, 4317, 4318, 8888, 2020 } ip saddr @cluster_nets accept
+        udp dport 8472 ip saddr @cluster_nets accept
+{% endif %}
+{% if nft_is_server %}
+        tcp dport { 2379, 2380, 2381, 9345 } ip saddr @cluster_nets accept
+        tcp dport 6443 ip saddr @cluster_nets accept
+        tcp dport 6443 ip saddr @admin_nets accept
+        tcp dport { 6443, 9345 } ip saddr @health_nets accept
+{% endif %}
+
+        # Everything else is dropped and counted.
+        counter drop
+    }
+
+    chain forward {
+        # Accept forwarded traffic. A default-drop forward chain breaks all
+        # pod egress: packets from the pod veth to the physical NIC traverse
+        # this hook. Ingress policy is enforced by the input chain, the AWS
+        # security group and Cilium; egress is constrained by Cilium policy.
+        type filter hook forward priority filter; policy accept;
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}

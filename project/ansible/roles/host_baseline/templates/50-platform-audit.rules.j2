@@ -1,0 +1,19 @@
+# Managed by platform-lab Ansible.
+#
+# Host-level audit covers operating-system state. Kubernetes object access is
+# covered by the kube-apiserver audit policy, not by file watches: watching
+# etcd's data files produces noise without answering "who read this Secret".
+-w /etc/passwd -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/sudoers -p wa -k privilege
+-w /etc/sudoers.d/ -p wa -k privilege
+-a always,exit -F arch=b64 -S setuid -S setgid -S setreuid -S setregid -k privilege_escalation
+
+-w /etc/ssh/sshd_config -p wa -k sshd
+-w /etc/ssh/sshd_config.d/ -p wa -k sshd
+-w /etc/nftables.conf -p wa -k firewall
+-w /etc/audit/rules.d/ -p wa -k audit_rules
+
+-a always,exit -F arch=b64 -S init_module -S finit_module -S delete_module -k module_load

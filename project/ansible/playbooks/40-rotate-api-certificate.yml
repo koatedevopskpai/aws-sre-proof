@@ -1,0 +1,59 @@
+---
+- name: Rotate API-server leaf certificates on one explicitly selected server
+  hosts: "{{ rotation_node | default('no_rotation_node_selected') }}"
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Require a single authorised server and recorded recovery readiness
+      ansible.builtin.assert:
+        that:
+          - rotation_authorised | default(false) | bool
+          - inventory_hostname in groups['rke2_servers']
+          - ansible_play_hosts_all | length == 1
+        fail_msg: Select exactly one lab server; verify peers, observer and recovery before rotation.
+    - name: Check the local API and etcd health before rotation
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /healthz/etcd
+      changed_when: false
+    - name: Capture API leaf fingerprint before rotation
+      ansible.builtin.command: openssl x509 -in /var/lib/rancher/rke2/server/tls/serving-kube-apiserver.crt -noout -fingerprint -sha256
+      register: cert_before
+      changed_when: false
+    - name: Capture public certificate expiry information
+      ansible.builtin.command: /usr/local/bin/rke2 certificate check --output table
+      changed_when: false
+  tasks:
+    - name: Stop only the selected server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: stopped
+    - name: Rotate only API-server leaf material
+      ansible.builtin.command: /usr/local/bin/rke2 certificate rotate --service api-server
+    - name: Start the selected server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+    - name: Wait for that server's local API
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /readyz
+      register: rotation_ready
+      retries: 60
+      delay: 10
+      until: rotation_ready.rc == 0
+      changed_when: false
+    - name: Capture the new public leaf fingerprint
+      ansible.builtin.command: openssl x509 -in /var/lib/rancher/rke2/server/tls/serving-kube-apiserver.crt -noout -fingerprint -sha256
+      register: cert_after
+      changed_when: false
+    - name: Verify rotation changed the certificate identity
+      ansible.builtin.assert:
+        that:
+          - cert_after.stdout != cert_before.stdout
+    - name: Verify etcd health after the selected server returns
+      ansible.builtin.command: /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get --raw /healthz/etcd
+      changed_when: false
+    - name: Report only public certificate fingerprints
+      ansible.builtin.debug:
+        msg:
+          before: "{{ cert_before.stdout }}"
+          after: "{{ cert_after.stdout }}"

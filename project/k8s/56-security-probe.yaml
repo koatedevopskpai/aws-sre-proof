@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: security-probe
+  namespace: default
+  labels:
+    app.kubernetes.io/name: security-probe
+    app.kubernetes.io/part-of: platform-lab
+spec:
+  serviceAccountName: default
+  automountServiceAccountToken: true
+  imagePullSecrets:
+    - name: ecr-pull
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: probe
+      image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/galland-rke2-use1/probe@sha256:REPLACE_WITH_VERIFIED_IMAGE_DIGEST
+      command:
+        - python3
+        - -c
+        - |
+          import ssl, urllib.request
+          token = open('/var/run/secrets/kubernetes.io/serviceaccount/token').read().strip()
+          context = ssl.create_default_context(cafile='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt')
+          request = urllib.request.Request(
+              'https://kubernetes.default.svc/api/v1/namespaces/tenant-probe/secrets',
+              headers={'Authorization': 'Bearer ' + token},
+          )
+          try:
+              urllib.request.urlopen(request, context=context, timeout=5)
+              print('UNEXPECTED_ALLOW')
+          except Exception as error:
+              print('DENIED', type(error).__name__, getattr(error, 'code', None))
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+

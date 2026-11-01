@@ -1,0 +1,92 @@
+# Run through scripts/validate_s6_rules.py, which renders the canonical rule file.
+rule_files: [s6.rules.yml]
+evaluation_interval: 15s
+tests:
+  - name: healthy_root_traffic
+    interval: 1m
+    input_series:
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code="200"}'
+        values: '0+60x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: GallandProbeRootErrors
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: GallandProbeNoRootObservations
+        exp_alerts: []
+  - name: sustained_failure_pending_then_firing
+    interval: 1m
+    input_series:
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code="500"}'
+        values: '0+60x10'
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/healthz",code="200"}'
+        values: '0+60000x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: GallandProbeRootErrors
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: GallandProbeRootErrors
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: tenant-probe, exercise: S6, run_id: s6-local-validation}
+            exp_annotations: {summary: Synthetic root request error ratio exceeds 5 percent}
+  - name: no_root_metrics_is_not_healthy
+    input_series: []
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: GallandProbeNoRootObservations
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: tenant-probe, exercise: S6, run_id: s6-local-validation}
+            exp_annotations: {summary: No usable root request observations; do not report success}
+  - name: health_checks_do_not_substitute_for_user_traffic
+    interval: 1m
+    input_series:
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/healthz",code="200"}'
+        values: '0+60x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: GallandProbeNoRootObservations
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: tenant-probe, exercise: S6, run_id: s6-local-validation}
+            exp_annotations: {summary: No usable root request observations; do not report success}
+  - name: zero_root_rate_is_not_healthy
+    interval: 1m
+    input_series:
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code="200"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: GallandProbeNoRootObservations
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: tenant-probe, exercise: S6, run_id: s6-local-validation}
+            exp_annotations: {summary: No usable root request observations; do not report success}
+      - eval_time: 4m
+        alertname: GallandProbeRootErrors
+        exp_alerts: []
+  - name: recovery_resolves_error_alert
+    interval: 1m
+    input_series:
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code="500"}'
+        values: '0+60x4 240+0x10'
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code="200"}'
+        values: '0+0x4 0+60x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: GallandProbeRootErrors
+        exp_alerts:
+          - exp_labels: {severity: warning, namespace: tenant-probe, exercise: S6, run_id: s6-local-validation}
+            exp_annotations: {summary: Synthetic root request error ratio exceeds 5 percent}
+      - eval_time: 9m
+        alertname: GallandProbeRootErrors
+        exp_alerts: []
+  - name: unrelated_service_errors_do_not_trip_probe_alert
+    interval: 1m
+    input_series:
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code="200"}'
+        values: '0+60x10'
+      - series: 'probe_route_requests_total{namespace="tenant-probe",service="other",route="/",code="500"}'
+        values: '0+600x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: GallandProbeRootErrors
+        exp_alerts: []

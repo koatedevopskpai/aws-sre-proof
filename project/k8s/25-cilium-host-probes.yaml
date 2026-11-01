@@ -1,0 +1,36 @@
+# Standard NetworkPolicy ipBlock rules do not match Cilium's local host
+# identity for kubelet health probes. This Cilium policy makes the host path
+# explicit while leaving tenant ingress default-deny.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kubelet-probes
+  namespace: tenant-probe
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+    - fromCIDR:
+        - 10.42.0.0/16
+        - 10.60.0.0/16
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+  # The telemetry gateway uses host networking for node-profile credentials.
+  # Permit only OTLP/HTTP to local/remote node identities; DNS remains in the
+  # existing namespace-scoped NetworkPolicy.
+  egress:
+    - toEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "4318"
+              protocol: TCP

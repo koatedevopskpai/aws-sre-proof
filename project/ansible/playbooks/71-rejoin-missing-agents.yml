@@ -1,0 +1,14 @@
+---
+# The rebuild play used serial=2 and aborted after the first worker batch, so
+# workers 3 and 4 never received RKE2. Install and join them now.
+- name: Install and join the remaining workers
+  hosts: rke2_agents[2:]
+  become: true
+  gather_facts: true
+  serial: 1
+  any_errors_fatal: true
+  vars:
+    rke2_token: "{{ lookup('file', recovery_dir + '/node-token') | trim }}"
+  roles:
+    - rke2_common
+    - rke2_agent

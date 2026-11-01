@@ -1,0 +1,20 @@
+# The Prometheus Operator expects a headless Service describing kubelets
+# (--kubelet-service=kube-system/kube-prometheus-stack-kubelet). The Helm chart
+# normally creates it; the failed hook in this environment left it absent and
+# the operator blocked on startup and was killed by its liveness probe.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-prometheus-stack-kubelet
+  namespace: kube-system
+  labels:
+    k8s-app: kubelet
+    platform.lab/managed: "true"
+spec:
+  clusterIP: None
+  type: ClusterIP
+  ports:
+    - name: https-metrics
+      port: 10250
+      protocol: TCP
+      targetPort: 10250

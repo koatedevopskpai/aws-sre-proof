@@ -1,0 +1,84 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: platform-lab
+# RequestReceived is omitted everywhere: it duplicates every request and
+# doubles log volume without adding forensic value.
+omitStages:
+  - RequestReceived
+rules:
+  # Interactive access is the highest-value audit record. The body is captured
+  # because "who exec'd where" is insufficient without the command.
+  - level: RequestResponse
+    verbs: ["create"]
+    resources:
+      - group: ""
+        resources: ["pods/exec", "pods/attach", "pods/portforward"]
+
+  # Record identity/action/resource for Secrets without copying credential bodies.
+  - level: Metadata
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    resources:
+      - group: ""
+        resources: ["secrets"]
+
+  # Authorisation and identity changes.
+  - level: Request
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+      - group: ""
+        resources: ["serviceaccounts"]
+
+  # Admission and policy objects.
+  - level: Request
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: "kyverno.io"
+        resources: ["clusterpolicies", "policies"]
+
+  # Workload and network changes: metadata only, to keep volume bounded.
+  - level: Metadata
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: ""
+        resources: ["pods", "services", "configmaps", "persistentvolumeclaims", "namespaces"]
+      - group: "apps"
+        resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+      - group: "batch"
+        resources: ["jobs", "cronjobs"]
+      - group: "networking.k8s.io"
+        resources: ["networkpolicies", "ingresses"]
+
+  # Read-only access to ordinary objects is not needed for this lab's
+  # detections and would dominate the log.
+  - level: None
+    verbs: ["get", "list", "watch"]
+    resources:
+      - group: ""
+        resources: ["pods", "services", "endpoints", "configmaps", "namespaces", "nodes"]
+      - group: "apps"
+        resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+
+  # Health and discovery probes from kubelets and the control plane.
+  - level: None
+    userGroups: ["system:nodes", "system:masters"]
+    nonResourceURLs:
+      - "/healthz*"
+      - "/livez*"
+      - "/readyz*"
+      - "/version"
+      - "/api*"
+      - "/apis*"
+      - "/openapi*"
+
+  - level: None
+    users:
+      - "system:kube-proxy"
+      - "system:kube-controller-manager"
+      - "system:kube-scheduler"
+    verbs: ["get", "list", "watch"]
+
+  # Anything not matched above is recorded at Metadata level.
+  - level: Metadata

@@ -1,0 +1,11 @@
+# Intentionally vulnerable image for the scanning / remediation exercise.
+# It is built, scanned and never deployed to the cluster.
+FROM python:3.9-slim
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY app.py /app/app.py
+
+# No USER directive, no healthcheck, full root user: the three findings the
+# hardened Dockerfile fixes.
+ENTRYPOINT ["python3", "/app/app.py"]

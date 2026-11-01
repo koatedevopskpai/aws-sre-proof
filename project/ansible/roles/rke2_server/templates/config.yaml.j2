@@ -1,0 +1,47 @@
+node-name: {{ inventory_hostname }}
+node-ip: {{ private_ip }}
+data-dir: /var/lib/rancher/rke2
+{% if rke2_token %}
+token: "{{ rke2_token }}"
+{% endif %}
+{% if not rke2_first_server %}
+# The first server is the bootstrap target. A joining server can be sent back
+# to itself by a passthrough load balancer before it is listening, so servers
+# join through server 1 directly; agents and operators use the NLB.
+server: https://{{ hostvars[groups['rke2_servers'][0]].private_ip }}:9345
+{% endif %}
+
+# Every name or address a client or joining node may use must be in the
+# serving certificate, otherwise registration fails with a TLS error that
+# looks like a network problem.
+tls-san:
+  - {{ lab_api_host }}
+  - {{ lab_registration_host }}
+  - {{ lab_nlb_dns }}
+  - {{ inventory_hostname }}
+  - {{ private_ip }}
+
+cni: cilium
+disable-kube-proxy: true
+ingress-controller: none
+
+write-kubeconfig-mode: "0600"
+secrets-encryption-provider: secretbox
+
+audit-policy-file: {{ rke2_config_dir }}/audit-policy.yaml
+
+pod-security-admission-config-file: {{ rke2_config_dir }}/pod-security.yaml
+
+etcd-expose-metrics: true
+etcd-snapshot-schedule-cron: "0 */4 * * *"
+etcd-snapshot-retention: 6
+etcd-snapshot-compress: true
+
+protect-kernel-defaults: true
+
+kubelet-arg:
+  - "max-pods=110"
+
+node-label:
+  - "platform.lab/role=control-plane"
+  - "topology.kubernetes.io/zone={{ zone }}"

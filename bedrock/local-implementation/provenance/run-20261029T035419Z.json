@@ -1,0 +1,18 @@
+{
+  "runId": "20261029T035419Z",
+  "startedAt": "2026-10-29T03:56:07.074Z",
+  "region": "eu-west-2",
+  "mode": "local-only",
+  "status": "LOCAL_CHECKS_PASSED",
+  "humanReview": "PENDING: inspect recovery answer against fixture and out-of-context refusal",
+  "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+  "agentModelId": "deepseek.v3.2",
+  "sourceHashes": {
+    "lib/agentic-ai-platform-stack.ts": "812b2763eaaa120d249203f766f08c51955dac0bd2389b942d4efb09f378a30e",
+    "lambda/agent-plan/index.ts": "c8934e64b0700c0238b98d77c27b639e2330ba4e081d9edbc4b8cfcec8023fdd",
+    "lambda/agent-act/index.ts": "183a7d0e2e17b383d7ef61a9c12be7db5c0f2a9ae20120ec14f6f9677bdb56c8",
+    "scripts/lab-run.cjs": "ffa1e683fee276c3b9fbaf2ea26200eb4cf15cfe8c35dff587567428e98e7419",
+    "scripts/lab-support.cjs": "7bdc9cc30ad218eaa0a7b2af59e020474adeda31d2053d71d671c582fccab55c",
+    "package-lock.json": "8eea37a8c7cd68a5c7f1d68ec26681e651e49e8d8ee7b97f4fff4baf160d80e9"
+  }
+}

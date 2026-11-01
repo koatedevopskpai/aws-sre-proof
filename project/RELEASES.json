@@ -1,0 +1,14 @@
+[
+  {
+    "tag": "v1.36.4+rke2r1",
+    "url": "https://github.com/rancher/rke2/releases/tag/v1.36.4%2Brke2r1",
+    "required_assets_present": true,
+    "published": true
+  },
+  {
+    "tag": "v1.36.5+rke2r1",
+    "url": "https://github.com/rancher/rke2/releases/tag/v1.36.5%2Brke2r1",
+    "required_assets_present": true,
+    "published": true
+  }
+]

@@ -1,0 +1,157 @@
+---
+# Rebuild a cluster from zero after every node and disk was destroyed.
+#
+# The first server installs RKE2, restores the fetched etcd snapshot with
+# --cluster-reset, then starts. The remaining servers and agents join with the
+# saved token. The snapshot restores Kubernetes objects and certificates, not
+# application PVC bytes; application data is restored separately.
+- name: Restore the first server from the off-cluster snapshot
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  vars:
+    rke2_first_server: true
+    rke2_skip_start: true
+    rke2_token: "{{ lookup('file', recovery_dir + '/node-token') | trim }}"
+  roles:
+    - rke2_common
+    - rke2_server
+  tasks:
+    - name: Create the snapshot directory
+      ansible.builtin.file:
+        path: /var/lib/rancher/rke2/server/db/snapshots
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Copy the off-cluster snapshot onto the new server
+      ansible.builtin.copy:
+        src: "{{ recovery_dir }}/etcd.zip"
+        dest: /var/lib/rancher/rke2/server/db/snapshots/restore.zip
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Restore the snapshot and reset membership
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/rke2
+          - server
+          - --cluster-reset
+          - --etcd-s3=false
+          - --cluster-reset-restore-path=/var/lib/rancher/rke2/server/db/snapshots/restore.zip
+      register: dr_reset
+      changed_when: true
+
+    - name: Start the restored server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for the restored API server
+      ansible.builtin.command:
+        argv:
+          - /var/lib/rancher/rke2/bin/kubectl
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - get
+          - --raw=/readyz
+      register: dr_api
+      retries: 90
+      delay: 10
+      until: dr_api.rc == 0
+      changed_when: false
+
+- name: Rejoin the remaining control-plane nodes
+  hosts: rke2_servers[1:]
+  become: true
+  gather_facts: true
+  serial: 1
+  any_errors_fatal: true
+  vars:
+    rke2_first_server: false
+    rke2_token: "{{ lookup('file', recovery_dir + '/node-token') | trim }}"
+  roles:
+    - rke2_common
+    - rke2_server
+
+- name: Rejoin the workers
+  hosts: rke2_agents
+  become: true
+  gather_facts: true
+  serial: 2
+  vars:
+    rke2_token: "{{ lookup('file', recovery_dir + '/node-token') | trim }}"
+  roles:
+    - rke2_common
+    - rke2_agent
+
+- name: Verify the restored cluster
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    lab_kubectl: /var/lib/rancher/rke2/bin/kubectl
+  tasks:
+    - name: Wait for every expected node to become Ready
+      ansible.builtin.command:
+        cmd: >-
+          {{ lab_kubectl }} --kubeconfig /etc/rancher/rke2/rke2.yaml
+          get nodes -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}'
+      register: dr_nodes
+      retries: 60
+      delay: 10
+      until: >-
+        dr_nodes.stdout.split() | select('equalto', 'True') | list | length ==
+        (groups['rke2_servers'] | length + groups['rke2_agents'] | length)
+      changed_when: false
+
+    - name: Read the pre-disaster marker
+      ansible.builtin.command:
+        argv:
+          - "{{ lab_kubectl }}"
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - -n
+          - tenant-probe
+          - get
+          - configmap
+          - dr-marker
+          - -o
+          - jsonpath={.data.state}
+      register: dr_marker
+      changed_when: false
+
+    - name: Assert the marker came back from the snapshot
+      ansible.builtin.assert:
+        that:
+          - dr_marker.stdout == 'pre-disaster'
+        fail_msg: "Marker is {{ dr_marker.stdout }}; the cluster did not restore the expected state."
+
+    - name: Check embedded etcd health
+      ansible.builtin.command:
+        argv:
+          - "{{ lab_kubectl }}"
+          - --kubeconfig
+          - /etc/rancher/rke2/rke2.yaml
+          - get
+          - --raw=/healthz/etcd
+      register: dr_etcd
+      changed_when: false
+
+    - name: Record the recovery verification
+      ansible.builtin.copy:
+        dest: "{{ recovery_dir }}/verify.txt"
+        mode: "0600"
+        content: |
+          verified_at: {{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}
+          ready_nodes: {{ dr_nodes.stdout.split() | length }}
+          etcd: {{ dr_etcd.stdout }}
+          marker: {{ dr_marker.stdout }}
+      delegate_to: localhost
+      become: false

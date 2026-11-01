@@ -1,0 +1,126 @@
+# Two long-lived test clients. They are part of the evidence harness, not the
+# application: one proves the permitted path, the other proves the deny path.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client
+  namespace: tenant-client
+  labels:
+    app.kubernetes.io/name: client
+    app.kubernetes.io/part-of: platform-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: client
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: client
+        app.kubernetes.io/part-of: platform-lab
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ecr-pull
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: client
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/galland-rke2-use1/probe@sha256:REPLACE_WITH_VERIFIED_IMAGE_DIGEST
+          command:
+            - python3
+            - -c
+            - |
+              import time, urllib.request
+              while True:
+                  try:
+                      response = urllib.request.urlopen(
+                          "http://probe.tenant-probe.svc.cluster.local:8080/", timeout=3
+                      )
+                      print("client ok", response.status, response.read().decode(), flush=True)
+                  except Exception as error:
+                      print("client error", error, flush=True)
+                  time.sleep(5)
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attacker
+  namespace: tenant-attacker
+  labels:
+    app.kubernetes.io/name: attacker
+    app.kubernetes.io/part-of: platform-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: attacker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: attacker
+        app.kubernetes.io/part-of: platform-lab
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ecr-pull
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: attacker
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/galland-rke2-use1/probe@sha256:REPLACE_WITH_VERIFIED_IMAGE_DIGEST
+          command: ["python3", "-c", "import time\nwhile True: time.sleep(3600)"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: probe-stateful
+  namespace: platform-system
+  labels:
+    platform.lab/managed: "true"
+spec:
+  namespaceSelector:
+    matchNames: [tenant-probe]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: probe-stateful
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+

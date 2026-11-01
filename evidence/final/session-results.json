@@ -1,0 +1,14 @@
+{
+  "run_id": "20261031T151734Z-galland",
+  "region": "us-east-1",
+  "S0": "DEMONSTRATED",
+  "S1": "DEMONSTRATED_IN_EARLIER_RUN_600_REQUESTS",
+  "S2": "DEMONSTRATED",
+  "S3": "DEMONSTRATED",
+  "S4": "DEMONSTRATED_ONE_API_LEAF",
+  "S5": "DEMONSTRATED_LAB_LOCAL_GIT",
+  "S6": "DEMONSTRATED",
+  "S7": "TEARDOWN_VERIFIED_BILLING_PENDING",
+  "cleanup_checked_utc": "2026-10-31T17:56:34.885421+00:00",
+  "billing_reconciled": false
+}

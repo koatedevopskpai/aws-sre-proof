@@ -1,0 +1,114 @@
+{
+  "schema": "galland-runtime-excerpts-v1",
+  "purpose": "Minimal sanitised excerpts derived from private runtime records. Resource identifiers, account details, private paths and raw logs are intentionally omitted.",
+  "source_runs": {
+    "final": "20261031T151734Z-galland",
+    "earlier_worker": "20261031T031410Z-phase1"
+  },
+  "S0_baseline": {
+    "run_id": "20261031T151734Z-galland",
+    "resource_count": 96,
+    "nodes_ready": 7,
+    "node_version": "v1.36.4+rke2r1",
+    "etcd_health": "ok",
+    "pvc_bound": 3,
+    "baseline_ready_utc": "2026-10-31T15:36:21Z",
+    "source": "private baseline-ready.txt, nodes-baseline.json, pvc-baseline.txt, etcd-baseline.txt"
+  },
+  "S1_worker_replacement": {
+    "run_id": "20261031T031410Z-phase1",
+    "attempts": 600,
+    "accepted": 600,
+    "errors": 0,
+    "p95_attempt_latency_ms": 48.598,
+    "window_utc": "2026-10-31T04:01:55.098Z to 2026-10-31T04:11:53.941Z",
+    "replacement_distinct_instance": true,
+    "old_instance_terminated": true,
+    "ready_nodes_after": 7,
+    "first_attempt_observer_failed": true,
+    "source": "private worker-observations-2.jsonl and observer-summary-2.json"
+  },
+  "S2_server_replacement": {
+    "run_id": "20261031T151734Z-galland",
+    "distinct_instance": true,
+    "old_instance_terminated": true,
+    "etcd_healthy_endpoints": 3,
+    "etcd_member_count": 3,
+    "ready_nodes": 7,
+    "pvc_uids_preserved": true,
+    "synthetic_marker_count_before": 2,
+    "synthetic_marker_count_after": 2,
+    "scope": "One non-bootstrap server; not simultaneous quorum loss or regional disaster recovery",
+    "source": "private server-replacement-result.json, server-members-after.log, server-pvc-before/after.log"
+  },
+  "S3_upgrade": {
+    "run_id": "20261031T151734Z-galland",
+    "nodes_before": 7,
+    "version_before": "v1.36.4+rke2r1",
+    "nodes_after": 7,
+    "version_after": "v1.36.5+rke2r1",
+    "all_nodes_ready_after": true,
+    "api_etcd_application_checks_passed": true,
+    "continuous_availability_claim": false,
+    "limitation": "External NodePort observer preflight failed; before/after health only",
+    "source": "private upgrade/nodes-before.json, upgrade/nodes-after.json, upgrade/observer-limitation.txt"
+  },
+  "S4_api_leaf_rotation": {
+    "run_id": "20261031T151734Z-galland",
+    "fingerprint_before_sha256": "bd20973a0088d26b56081d3bc8877c8556bfc9ebc18af917448c364d241db261",
+    "fingerprint_after_sha256": "2997f8b7b85f2941657494f6056c059e6883eba1588f613053a1d220086d3d2c",
+    "fingerprint_changed": true,
+    "live_endpoint_matches_after": true,
+    "ca_chain_and_ip_verification_passed": true,
+    "ca_rotation": false,
+    "limitation": "One server API leaf; occurred before that server was replaced",
+    "source": "private rotation/cert-before.txt, cert-after.txt, live-endpoint-after.txt"
+  },
+  "S5_gitops": {
+    "run_id": "20261031T151734Z-galland",
+    "revision_a": "0c7e7d95e66e425679a36667d34266a81f713e2c",
+    "revision_b": "8e84368e49292f837ca3ec6a5d4a8b586eb5acf2",
+    "revision_revert": "d83623822bd70e16dd480bf3769aad04e3e19414",
+    "drift_self_healed": true,
+    "unhealthy_revision_observed": "Degraded",
+    "revert_observed": "Synced/Healthy",
+    "source_scope": "Lab-local read-only Git protocol service; no external GitHub push",
+    "limitation": "Bad readiness rollout can leave old replicas serving; not proof of user outage",
+    "source": "private gitops/result.json and gitops revision bundles"
+  },
+  "S6_fault_alert_recovery": {
+    "run_id": "20261031T151734Z-galland",
+    "baseline": {"attempts": 180, "accepted": 180, "errors": 0, "p95_ms": 69.82},
+    "fault": {"attempts": 240, "accepted": 12, "errors": 228, "p95_ms": 61.396},
+    "recovery": {"attempts": 300, "accepted": 300, "errors": 0, "p95_ms": 19.085},
+    "firing_received_utc": "2026-10-31T15:42:27.410893+00:00",
+    "resolved_received_utc": "2026-10-31T15:46:27.409041+00:00",
+    "cloudwatch_readback_events": 2,
+    "delivery_scope": "In-cluster receiver and CloudWatch Logs; not a human page or CloudWatch alarm",
+    "source": "private s6/check-result.json, s6/receipts.json, cloudwatch-s6-events.json"
+  },
+  "S7_cleanup": {
+    "earlier_run": {
+      "run_id": "20261031T031410Z-phase1",
+      "delete_count": 96,
+      "create_count": 0,
+      "update_count": 0,
+      "scope_gate": "PASS",
+      "managed_state_empty": true,
+      "independent_inventory_passed": true
+    },
+    "final_run": {
+      "run_id": "20261031T151734Z-galland",
+      "delete_count": 96,
+      "create_count": 0,
+      "update_count": 0,
+      "scope_gate": "PASS",
+      "managed_state_empty": true,
+      "independent_inventory_passed": true,
+      "checked_utc": "2026-10-31T17:56:34.885421+00:00"
+    },
+    "retained": "Unrelated stopped PulseNotify instance, its EBS root volume, unassociated EIP and the retained Terraform backend",
+    "billing_reconciled": false,
+    "source": "private destroy-scope-summary.json, cleanup-inventory.json, cleanup-inventory-independent.json, cleanup-verification-report.md"
+  }
+}

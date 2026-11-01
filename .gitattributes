@@ -1,0 +1,2 @@
+# Preserve exact bytes so evidence hashes and line endings are reproducible.
+* -text

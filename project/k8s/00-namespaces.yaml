@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-system
+  labels:
+    platform.lab/managed: "true"
+    platform.lab/tier: platform
+    # Baseline, not restricted: node-exporter needs hostPath and hostNetwork.
+    # The exception is explicit and Kyverno policies exclude this namespace.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: falco-system
+  labels:
+    platform.lab/managed: "true"
+    platform.lab/tier: security
+    # Falco loads an eBPF program and needs privileged host access. This is the
+    # only namespace allowed to run privileged pods, and it contains no tenant
+    # workloads.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: siem
+  labels:
+    platform.lab/managed: "true"
+    platform.lab/tier: security
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-probe
+  labels:
+    platform.lab/managed: "true"
+    platform.lab/tier: tenant
+    platform.lab/team: platform-lab
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-client
+  labels:
+    platform.lab/managed: "true"
+    platform.lab/tier: tenant
+    platform.lab/team: platform-lab
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-attacker
+  labels:
+    platform.lab/managed: "true"
+    platform.lab/tier: tenant
+    platform.lab/team: red-team
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

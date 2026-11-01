@@ -1,0 +1,43 @@
+---
+- name: Read the existing cluster join token privately
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the token without logging it
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/rke2/server/node-token
+      register: join_token_raw
+      no_log: true
+    - name: Hold the token only in memory
+      ansible.builtin.set_fact:
+        replacement_join_token: "{{ join_token_raw.content | b64decode | trim }}"
+      no_log: true
+
+- name: Baseline exactly one replacement non-bootstrap server
+  hosts: "{{ replacement_node }}"
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Require one authorised non-bootstrap server
+      ansible.builtin.assert:
+        that:
+          - replacement_authorised | default(false) | bool
+          - inventory_hostname in groups['rke2_servers']
+          - inventory_hostname != groups['rke2_servers'][0]
+          - ansible_play_hosts_all | length == 1
+  roles:
+    - host_baseline
+
+- name: Join the replacement to the existing cluster
+  hosts: "{{ replacement_node }}"
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  roles:
+    - rke2_common
+    - role: rke2_server
+      vars:
+        rke2_first_server: false
+        rke2_token: "{{ hostvars[groups['rke2_servers'][0]].replacement_join_token }}"

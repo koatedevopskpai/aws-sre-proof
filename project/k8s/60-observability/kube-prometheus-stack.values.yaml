@@ -1,0 +1,177 @@
+# ---------------------------------------------------------------------------
+# Metrics, dashboards, alert routing.
+#
+# Deliberate scope choices:
+#   * etcd metrics are disabled: RKE2 serves them with client-certificate auth
+#     and distributing those certs to Prometheus is a larger change than this
+#     lab justifies. API/etcd health is covered by blackbox probes and the
+#     exercise scripts instead.
+#   * the operator admission webhook is disabled to avoid a self-signed
+#     webhook becoming a single point of failure in a short-lived lab.
+# ---------------------------------------------------------------------------
+fullnameOverride: kube-prometheus-stack
+
+prometheusOperator:
+  tls:
+    enabled: false
+  # The chart's certgen hook fails in this cluster and blocks the release.
+  # The operator still mounts the TLS secret, so scripts/fix-prometheus-webhook.sh
+  # generates it once. With no webhook configuration registered, the API
+  # server never calls the operator's admission endpoint; CRD validation is
+  # therefore not enforced. That is documented in docs/limitations.md.
+  admissionWebhooks:
+    enabled: false
+    patch:
+      enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 6h
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    externalLabels:
+      cluster: galland-rke2-use1
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: ebs-gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+  service:
+    type: ClusterIP
+
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: alert-sink
+      group_by: ["alertname", "namespace", "instance"]
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+    receivers:
+      - name: alert-sink
+        webhook_configs:
+          - url: http://alert-sink.siem.svc.cluster.local:8080/alerts
+            send_resolved: true
+      # The chart's default Watchdog route targets a receiver named "null".
+      # Replacing the receivers list without it makes Alertmanager reject the
+      # whole configuration ("undefined receiver null used in route").
+      - name: "null"
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: ebs-gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+grafana:
+  enabled: true
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: false
+    datasources:
+      enabled: true
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: platform
+          orgId: 1
+          folder: Platform lab
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/platform
+  grafana.ini:
+    analytics:
+      check_for_updates: false
+      reporting_enabled: false
+    server:
+      disable_gravatar: true
+
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+kubeStateMetrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # KSM opens its HTTP server only after every informer has synced. On a cold
+  # cluster with 28 resource types and audit logging enabled, 30 seconds is not
+  # enough; the default liveness probe kills it before it can start.
+  livenessProbe:
+    initialDelaySeconds: 120
+    failureThreshold: 6
+  readinessProbe:
+    initialDelaySeconds: 30
+    failureThreshold: 12
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeProxy: false
+    kubeScheduler: false
+    kubeControllerManager: false
+

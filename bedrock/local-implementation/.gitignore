@@ -1,0 +1,12 @@
+node_modules/
+build/
+evidence/
+.handover-backup-*/
+cdk.out/
+cdk-agentcore.out/
+.cdk.staging/
+*.js
+!scripts/*.cjs
+!tests/*.cjs
+*.d.ts
+!lambda/**/*.js

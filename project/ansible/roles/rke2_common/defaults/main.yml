@@ -1,0 +1,12 @@
+---
+# Pinned release, verified against the published SHA256 manifest. The tarball
+# is extracted directly rather than piping get.rke2.io into a shell: the
+# installer script is convenient but gives the reviewer nothing to verify.
+rke2_release_base: "https://github.com/rancher/rke2/releases/download/{{ lab_rke2_version | replace('+', '%2B') }}"
+rke2_tarball: "rke2.linux-amd64.tar.gz"
+rke2_image_tarballs:
+  - rke2-images-core.linux-amd64.tar.zst
+  - rke2-images-cilium.linux-amd64.tar.zst
+rke2_preload_images: true
+rke2_download_dir: /var/tmp/rke2-install
+rke2_config_dir: /etc/rancher/rke2

@@ -1,0 +1,97 @@
+{
+  "project": "Galland AWS SRE Proof",
+  "run_id": "20261031T151734Z-galland",
+  "s1_run_id": "20261031T031410Z-phase1",
+  "region": "us-east-1",
+  "sanitised": true,
+  "claims": [
+    {
+      "id": "S0_baseline",
+      "title": "Isolated us-east-1 RKE2 baseline",
+      "status": "DEMONSTRATED",
+      "evidence": "96 Terraform resources; 3 server + 4 worker RKE2 v1.36.4+rke2r1 nodes Ready; Cilium KPR, EBS CSI, application and 3 bound gp3 PVCs; Prometheus targets healthy",
+      "qualification": "Single bounded synthetic lab"
+    },
+    {
+      "id": "S1_worker_replacement",
+      "title": "Worker replacement with bounded request observation",
+      "status": "DEMONSTRATED_IN_EARLIER_RUN",
+      "evidence": "600/600 accepted requests, one client at 1 req/s for 10 minutes; p95 48.598 ms; distinct replacement rejoined; 7 Ready",
+      "qualification": "Earlier run 20261031T031410Z-phase1; not a monthly SLO, production scale or zero-downtime guarantee; first attempt observer failed"
+    },
+    {
+      "id": "S2_server_replacement",
+      "title": "Single non-bootstrap control-plane replacement",
+      "status": "DEMONSTRATED",
+      "evidence": "Distinct EC2 identity; old instance terminated; 3 healthy etcd endpoints; 7 Ready; same application PVC UIDs; synthetic marker count 2 before/after",
+      "qualification": "Not simultaneous quorum loss or regional disaster recovery"
+    },
+    {
+      "id": "S3_upgrade",
+      "title": "RKE2 same-minor patch upgrade",
+      "status": "DEMONSTRATED",
+      "evidence": "All 7 nodes Ready on v1.36.5+rke2r1 from v1.36.4+rke2r1; API, etcd and post-upgrade application checks passed",
+      "qualification": "External NodePort observer preflight failed; no continuous-availability claim"
+    },
+    {
+      "id": "S4_leaf_rotation",
+      "title": "One server API leaf-certificate rotation",
+      "status": "DEMONSTRATED_ONE_API_LEAF",
+      "evidence": "Fingerprint changed and matched the directly verified live endpoint; CA and IP verification passed",
+      "qualification": "Not CA rotation; occurred before the server replacement, so no claim that a replacement VM retained the rotated certificate"
+    },
+    {
+      "id": "S5_gitops",
+      "title": "Argo CD delivery, drift correction and Git revert",
+      "status": "DEMONSTRATED_LAB_LOCAL_GIT",
+      "evidence": "Revision A Synced/Healthy; replica drift healed; readiness-regressed B observed Degraded; Git revert C Synced/Healthy",
+      "qualification": "Private read-only lab Git protocol service, not GitHub or authenticated production Git; Degraded does not prove user outage"
+    },
+    {
+      "id": "S6_reliability_alert",
+      "title": "Application fault, alert delivery and recovery",
+      "status": "DEMONSTRATED",
+      "evidence": "180/180 baseline accepted; 228 failures of 240 fault-window requests; 300/300 recovery accepted; matching firing/resolved receiver receipts and two CloudWatch readback events",
+      "qualification": "In-cluster receiver and CloudWatch Logs, not a human page; no monthly SLO"
+    },
+    {
+      "id": "S7_teardown_billing",
+      "title": "Cleanup and residual inventory",
+      "status": "TEARDOWN_VERIFIED_BILLING_PENDING",
+      "evidence": "96 managed resources destroyed; empty managed state; final 21-category audit passed; one extra Lambda log group removed; unrelated resources preserved",
+      "qualification": "Billing delayed and not reconciled; retained backend and unrelated account resources are exclusions"
+    },
+    {
+      "id": "BEDROCK_LOCAL_IMPLEMENTATION",
+      "title": "Local Bedrock implementation and tests",
+      "status": "LOCAL_VERIFIED",
+      "evidence": "bedrock/local-implementation/; 14/14 local tests pass; TypeScript build passes; latest local manifest 20261029T035419Z is local-only",
+      "qualification": "CDK, knowledge base, scoped tools, MCP server, Step Functions agent loop and managed Bedrock Agent are implemented; no live Bedrock invocation, deployment, trace or evaluation"
+    },
+    {
+      "id": "AGENTCORE_LOCAL_IMPLEMENTATION",
+      "title": "Local AgentCore Runtime implementation",
+      "status": "LOCAL_VERIFIED",
+      "evidence": "bedrock/agentcore/; 10/10 local tests pass; CDK synthesis passes",
+      "qualification": "Local container contract, execution bounds and CDK template only; no AgentCore resource was created and no live invocation is claimed"
+    },
+    {
+      "id": "BEDROCK_LIVE",
+      "title": "Live Bedrock/AgentCore delivery",
+      "status": "NOT_RUN",
+      "evidence": null,
+      "qualification": "No live Bedrock or AgentCore run has been performed; a live result requires a separate reviewed session with verified model access"
+    }
+  ],
+  "not_claimed": [
+    "Production scale, monthly SLO, zero-downtime guarantee or production on-call tenure",
+    "Regional disaster recovery or simultaneous etcd quorum loss",
+    "Cross-AZ EBS failover",
+    "CA rotation",
+    "GitHub-backed GitOps or authenticated external Git",
+    "Human paging from the S6 alert path",
+    "A reconciled AWS bill",
+    "A vulnerability-free or production-ready image",
+    "Live Bedrock or AgentCore competency"
+  ]
+}

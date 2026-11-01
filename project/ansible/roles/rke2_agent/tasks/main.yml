@@ -1,0 +1,35 @@
+---
+- name: Write the agent configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ rke2_config_dir }}/config.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: restart rke2 agent
+
+- name: Apply the agent restart before waiting
+  # The wait task can fail on a first join, and a failed play does not run
+  # handlers. Flush here so a changed server/registration address is always
+  # applied to the running agent before the readiness wait.
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the RKE2 agent without blocking on image import
+  ansible.builtin.command:
+    cmd: systemctl enable --now --no-block rke2-agent
+  changed_when: false
+
+- name: Wait for the kubelet to register
+  ansible.builtin.command:
+    cmd: >-
+      /var/lib/rancher/rke2/bin/kubectl
+      --kubeconfig /etc/rancher/rke2/rke2.yaml
+      get node {{ inventory_hostname }}
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  delegate_to: "{{ groups['rke2_servers'][0] }}"
+  register: agent_status
+  retries: 60
+  delay: 10
+  until: agent_status.stdout == "True"
+  changed_when: false

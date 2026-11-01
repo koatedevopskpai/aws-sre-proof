@@ -1,0 +1,39 @@
+{
+  "name": "agentic-ai-platform",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "agentic-ai-platform": "bin/agentic-ai-platform.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "npm run build && cdk synth",
+    "synth:agentcore": "npm run build && cdk synth --app \"node build/bin/agentcore-runtime.js\" -o cdk-agentcore.out",
+    "test": "node --test tests/*.test.cjs",
+    "lab:check": "node scripts/lab-run.cjs --check",
+    "lab:run": "node scripts/lab-run.cjs"
+  },
+  "dependencies": {
+    "@smithy/signature-v4": "5.7.4",
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.600.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.600.0",
+    "@aws-sdk/client-cloudformation": "^3.1157.0",
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-lambda": "^3.1156.0",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-sfn": "^3.1156.0",
+    "@cdklabs/generative-ai-cdk-constructs": "^0.1.300",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.3.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.160.0",
+    "esbuild": "^0.21.5",
+    "typescript": "~5.6.0"
+  }
+}

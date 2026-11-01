@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Falco runs with the modern eBPF probe: no kernel-module build, no privileged
+# container beyond the capabilities the probe needs, and it works on the EC2
+# Ubuntu kernel used by this lab.
+# ---------------------------------------------------------------------------
+driver:
+  kind: modern_ebpf
+
+# A harmless, identifiable exec probe. It detects a syscall, not a manually
+# posted webhook. The run-specific marker prevents an old alert passing a new run.
+customRules:
+  platform-evidence.yaml: |-
+    - rule: Platform lab benign exec evidence
+      desc: An explicitly named Python exec used to verify the lab detection path
+      condition: spawned_process and container and proc.cmdline contains "platform-evidence-falco-"
+      output: "Platform lab evidence exec (command=%proc.cmdline container=%container.id user=%user.name)"
+      priority: WARNING
+      tags: [platform_lab, evidence]
+
+tolerations:
+  - operator: Exists
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+falco:
+  json_output: true
+  json_include_output_property: true
+  json_include_tags_property: true
+  log_stderr: true
+  log_syslog: false
+  priority: notice
+
+falcosidekick:
+  enabled: true
+  replicaCount: 1
+  config:
+    webhook:
+      address: "http://alert-sink.siem.svc.cluster.local:8080/alerts"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

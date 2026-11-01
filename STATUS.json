@@ -1,0 +1,65 @@
+{
+  "project": "Galland AWS SRE Proof",
+  "stage": "PHASE1_COMPLETE_CLEANED",
+  "updated_utc": "2026-11-01",
+  "run_id": "20261031T151734Z-galland",
+  "region": "us-east-1",
+  "phase2a_region": "us-west-2",
+  "cloud_resources_running": false,
+  "cleanup_verified": true,
+  "cleanup_checked_utc": "2026-10-31T17:56:34.885421+00:00",
+  "billing_reconciled": false,
+  "sre_exercises": {
+    "S0_baseline": "DEMONSTRATED",
+    "S1_worker_replacement": "DEMONSTRATED_IN_EARLIER_RUN_600_REQUEST_WINDOW",
+    "S2_server_replacement": "DEMONSTRATED",
+    "S3_upgrade": "DEMONSTRATED_NO_CONTINUOUS_AVAILABILITY_CLAIM",
+    "S4_leaf_rotation": "DEMONSTRATED_ONE_API_LEAF",
+    "S5_gitops": "DEMONSTRATED_LAB_LOCAL_GIT",
+    "S6_reliability_alert": "DEMONSTRATED_IN_CLUSTER_AND_CLOUDWATCH_LOGS",
+    "S7_teardown_billing": "TEARDOWN_VERIFIED_BILLING_PENDING"
+  },
+  "bedrock": {
+    "status": "LOCAL_IMPLEMENTATION_VERIFIED_LIVE_NOT_RUN",
+    "live_evidence": false,
+    "local_implementation": "bedrock/local-implementation/",
+    "local_tests": {
+      "passed": 14,
+      "failed": 0
+    },
+    "local_build": "PASS",
+    "latest_local_manifest": "bedrock/local-implementation/provenance/run-20261029T035419Z.json",
+    "competency_map": "bedrock/COMPETENCY-MAP.md"
+  },
+  "evidence": "evidence/",
+  "claim_ledger": "CLAIM-LEDGER.json",
+  "phase2a": {
+    "status": "LOCAL_PREPARATION_ONLY",
+    "region": "us-west-2",
+    "live_results": "NOT_RUN",
+    "agentcore_implementation": "bedrock/agentcore/",
+    "local_tests": 10,
+    "cdk_synthesis": "PASS",
+    "nova_tpm_request": "DENIED_CURRENTLY",
+    "quota_blocker_cleared": false,
+    "live_status": "BLOCKED_MODEL_QUOTA",
+    "access_status": "bedrock/ACCESS-STATUS.md",
+    "last_recorded_quota_check_utc": "2026-10-31T22:50:24Z"
+  },
+  "capture": {
+    "reviewed_redacted_images": 5,
+    "ec2_redacted": true,
+    "originals_private": true,
+    "manifest": "docs/capture/images/MANIFEST.json",
+    "published": false
+  },
+  "github": {
+    "prepared": true,
+    "published": false,
+    "remote": null
+  },
+  "next_actions": [
+    "Live Bedrock/AgentCore remains unproven; a live AgentCore session needs verified model access, a bounded evidence plan and a cleanup owner",
+    "Reconcile delayed AWS billing; do not treat a zero/pending reading as zero cost"
+  ]
+}

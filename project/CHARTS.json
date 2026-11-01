@@ -1,0 +1,34 @@
+{
+  "charts": [
+    {
+      "name": "kube-prometheus-stack",
+      "version": "92.16.1",
+      "url": "https://github.com/prometheus-community/helm-charts/releases/download/kube-prometheus-stack-92.16.1/kube-prometheus-stack-92.16.1.tgz",
+      "sha256": "d2af1fccbd11fedad9e39ac7fd05d9b87613c801eb86cf3dfa33c4097a7fad97"
+    },
+    {
+      "name": "fluent-bit",
+      "version": "0.58.3",
+      "url": "https://github.com/fluent/helm-charts/releases/download/fluent-bit-0.58.3/fluent-bit-0.58.3.tgz",
+      "sha256": "99e025e461fa080e68dcfe65b8bc0bf64dd74d2c04b87cb910f9192fbf954f20"
+    },
+    {
+      "name": "falco",
+      "version": "9.2.2",
+      "url": "https://github.com/falcosecurity/charts/releases/download/falco-9.2.2/falco-9.2.2.tgz",
+      "sha256": "b8a1aa984c3d513ab1639be760e6a07a9eb203d4da77a45a1512d382b6d3687d"
+    },
+    {
+      "name": "aws-ebs-csi-driver",
+      "version": "2.67.2",
+      "url": "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-aws-ebs-csi-driver-2.67.2/aws-ebs-csi-driver-2.67.2.tgz",
+      "sha256": "514ed77d8c1450e64db0c18182a537ecb6fd88e96154c1ea7652205b29d5c6ae"
+    }
+  ],
+  "helm": {
+    "version": "3.22.1",
+    "sha256": "32ce9f4509b81782c9740898c43946e1f97c4d93ec5d10222c9b6eeec21ea043",
+    "source": "https://get.helm.sh/helm-v3.22.1-windows-amd64.zip"
+  },
+  "verification": "Upstream packages downloaded and hashes recorded; not a runtime compatibility claim."
+}

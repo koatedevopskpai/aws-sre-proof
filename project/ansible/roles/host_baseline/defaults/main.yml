@@ -1,0 +1,31 @@
+---
+timezone: UTC
+ssh_allow_tcp_forwarding: "no"
+nft_ssh_sources: "{{ [lab_admin_cidr, lab_vpc_cidr] }}"
+nft_cluster_sources: "{{ [lab_vpc_cidr, lab_cluster_cidr, lab_service_cidr] }}"
+nft_health_check_sources: "{{ [lab_vpc_cidr] }}"
+nft_is_server: "{{ inventory_hostname in groups['rke2_servers'] }}"
+nft_is_bastion: "{{ inventory_hostname in groups['bastion'] }}"
+
+baseline_packages:
+  - apt-transport-https
+  - auditd
+  - audispd-plugins
+  - ca-certificates
+  - chrony
+  - conntrack
+  - curl
+  - ebtables
+  - ethtool
+  - gnupg
+  - ipset
+  - iptables
+  - jq
+  - kmod
+  - nftables
+  - socat
+  - tar
+  - unattended-upgrades
+  - util-linux
+  - xfsprogs
+  - zstd

@@ -1,0 +1,318 @@
+{
+ "Resources": {
+  "RuntimeRoleFD8790A4": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": "123456789012"
+        },
+        "ArnLike": {
+         "aws:SourceArn": "arn:aws:bedrock-agentcore:us-west-2:123456789012:*"
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "bedrock-agentcore.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "AgentCore Runtime execution role for the synthetic read-only proof",
+    "RoleName": "galland_agentcore_proof_execution",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "galland-agentic-usw2"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GallandAgentCoreRuntimeStack/RuntimeRole/Resource"
+   }
+  },
+  "RuntimeRoleDefaultPolicy31263C89": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:ecr:us-west-2:123456789012:repository/*",
+       "Sid": "EcrImageAccess"
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "EcrTokenAccess"
+      },
+      {
+       "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:bedrock:*::foundation-model/*",
+        "arn:aws:bedrock:*:123456789012:inference-profile/*"
+       ],
+       "Sid": "BedrockInvoke"
+      },
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":lambda:us-west-2:123456789012:function/galland-query-incidents"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":lambda:us-west-2:123456789012:function/galland-read-s3-doc"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":lambda:us-west-2:123456789012:function/galland-cluster-status"
+          ]
+         ]
+        }
+       ],
+       "Sid": "ReadOnlyToolInvocation"
+      },
+      {
+       "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:PutResourcePolicy"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:logs:us-west-2:123456789012:log-group:/aws/bedrock-agentcore/runtimes/*",
+        "arn:aws:logs:us-west-2:123456789012:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
+       ],
+       "Sid": "RuntimeLogs"
+      },
+      {
+       "Action": "logs:DescribeLogGroups",
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "DescribeRuntimeLogGroups"
+      },
+      {
+       "Action": [
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets"
+       ],
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "RuntimeObservability"
+      },
+      {
+       "Action": "cloudwatch:PutMetricData",
+       "Condition": {
+        "StringEquals": {
+         "cloudwatch:namespace": "bedrock-agentcore"
+        }
+       },
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "RuntimeMetrics"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "RuntimeRoleDefaultPolicy31263C89",
+    "Roles": [
+     {
+      "Ref": "RuntimeRoleFD8790A4"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GallandAgentCoreRuntimeStack/RuntimeRole/DefaultPolicy/Resource"
+   }
+  },
+  "Runtime": {
+   "Type": "AWS::BedrockAgentCore::Runtime",
+   "Properties": {
+    "AgentRuntimeArtifact": {
+     "ContainerConfiguration": {
+      "ContainerUri": "123456789012.dkr.ecr.us-west-2.amazonaws.com/galland-agentcore:placeholder"
+     }
+    },
+    "AgentRuntimeName": "galland_agentcore_proof",
+    "Description": "Synthetic read-only AgentCore Runtime proof; no mutation tools",
+    "EnvironmentVariables": {
+     "AGENT_ENABLED": "true",
+     "MODEL_ID": "us.amazon.nova-2-lite-v1:0",
+     "QUERY_INCIDENTS_FUNCTION": "galland-query-incidents",
+     "READ_S3_DOC_FUNCTION": "galland-read-s3-doc",
+     "GET_CLUSTER_STATUS_FUNCTION": "galland-cluster-status",
+     "AGENT_MAX_TURNS": "4",
+     "AGENT_MAX_TOOL_CALLS": "6",
+     "AGENT_MAX_MODEL_CALLS": "4",
+     "AGENT_MAX_PROMPT_CHARS": "4000",
+     "AGENT_MAX_OUTPUT_TOKENS": "512",
+     "AGENT_MAX_RUNTIME_SECONDS": "60",
+     "AGENT_MAX_CONCURRENCY": "2"
+    },
+    "LifecycleConfiguration": {
+     "IdleRuntimeSessionTimeout": 300,
+     "MaxLifetime": 3600
+    },
+    "NetworkConfiguration": {
+     "NetworkMode": "PUBLIC"
+    },
+    "ProtocolConfiguration": "HTTP",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "RuntimeRoleFD8790A4",
+      "Arn"
+     ]
+    },
+    "Tags": {
+     "Environment": "lab",
+     "Project": "galland-agentic-usw2"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GallandAgentCoreRuntimeStack/Runtime"
+   }
+  },
+  "Endpoint": {
+   "Type": "AWS::BedrockAgentCore::RuntimeEndpoint",
+   "Properties": {
+    "AgentRuntimeId": {
+     "Fn::GetAtt": [
+      "Runtime",
+      "AgentRuntimeId"
+     ]
+    },
+    "Description": "Bounded synthetic proof endpoint",
+    "Name": "galland_agentcore_proof_endpoint",
+    "Tags": {
+     "Project": "galland-agentic-usw2"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GallandAgentCoreRuntimeStack/Endpoint"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/y2LQQ7CIBREz9I9/VbS6AGMa40ewFBA8wuFBj42hnB3g7iaN5N5HPhxhKETW+ylMr3FCfKdhDRMbPGRUSyQb95qdnq6X169RfmptVFhk1bBSyNe2pH0QUOu3+QIl6Y1PDu1enRUSh0vidZEhTmvNMxx9+Yj7A8wdHNE7ENT4K9+AdgdDFimAAAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GallandAgentCoreRuntimeStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AgentRuntimeArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "Runtime",
+     "AgentRuntimeArn"
+    ]
+   }
+  },
+  "AgentRuntimeId": {
+   "Value": {
+    "Fn::GetAtt": [
+     "Runtime",
+     "AgentRuntimeId"
+    ]
+   }
+  },
+  "AgentRuntimeEndpointArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "Endpoint",
+     "AgentRuntimeEndpointArn"
+    ]
+   }
+  },
+  "ExecutionRoleArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "RuntimeRoleFD8790A4",
+     "Arn"
+    ]
+   }
+  },
+  "LogGroupHint": {
+   "Value": "/aws/bedrock-agentcore/runtimes/galland_agentcore_proof"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

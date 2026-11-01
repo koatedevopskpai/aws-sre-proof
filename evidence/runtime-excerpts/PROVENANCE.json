@@ -1,0 +1,15 @@
+{
+  "note": "Sanitised excerpts; source originals private",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "26ce6d973a4939455d9fc691aae8dd3f043ca558721e1dadc150e8a66e510011",
+      "bytes": 1566
+    },
+    {
+      "path": "runtime-excerpts.json",
+      "sha256": "6d3fda66efd427a45dfd4a47d1739c74f2dbc49469b665bcab9294492d2333f3",
+      "bytes": 5030
+    }
+  ]
+}

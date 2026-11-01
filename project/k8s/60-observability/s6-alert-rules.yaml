@@ -1,0 +1,44 @@
+# Render a fresh run_id with scripts/prepare_s6_rules.py before a live session.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: galland-s6-probe
+  namespace: platform-system
+  labels:
+    platform.lab/managed: "true"
+spec:
+  groups:
+    - name: galland-s6
+      interval: 15s
+      rules:
+        - alert: GallandProbeRootErrors
+          expr: |
+            (
+              sum(rate(probe_route_requests_total{namespace="tenant-probe",service="probe",route="/",code=~"5.."}[2m]))
+              /
+              sum(rate(probe_route_requests_total{namespace="tenant-probe",service="probe",route="/"}[2m]))
+              > 0.05
+            )
+            and
+            (sum(rate(probe_route_requests_total{namespace="tenant-probe",service="probe",route="/"}[2m])) > 0)
+          for: 1m
+          labels:
+            severity: warning
+            namespace: tenant-probe
+            exercise: S6
+            run_id: REPLACE_RUN_ID
+          annotations:
+            summary: Synthetic root request error ratio exceeds 5 percent
+        - alert: GallandProbeNoRootObservations
+          expr: |
+            (sum(rate(probe_route_requests_total{namespace="tenant-probe",service="probe",route="/"}[2m])) == 0)
+            or
+            sum(absent(probe_route_requests_total{namespace="tenant-probe",service="probe",route="/"}))
+          for: 2m
+          labels:
+            severity: warning
+            namespace: tenant-probe
+            exercise: S6
+            run_id: REPLACE_RUN_ID
+          annotations:
+            summary: No usable root request observations; do not report success

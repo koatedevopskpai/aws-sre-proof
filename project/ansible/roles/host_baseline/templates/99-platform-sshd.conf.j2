@@ -1,0 +1,21 @@
+# Managed by platform-lab Ansible.
+# Ubuntu cloud images include 60-cloudimg-settings.conf; this file sorts after
+# it and therefore wins.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding {{ ssh_allow_tcp_forwarding }}
+PermitTunnel no
+MaxAuthTries 4
+MaxSessions 6
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+UseDNS no
+Banner /etc/issue.net
+LogLevel VERBOSE

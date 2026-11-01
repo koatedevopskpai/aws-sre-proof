@@ -1,0 +1,120 @@
+---
+- name: Create RKE2 directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ rke2_config_dir }}", mode: "0700" }
+    - { path: "{{ rke2_download_dir }}", mode: "0755" }
+    - { path: /var/lib/rancher/rke2, mode: "0750" }
+    - { path: /var/lib/rancher/rke2/agent/images, mode: "0750" }
+    - { path: /var/lib/rancher/rke2/server/manifests, mode: "0750" }
+    - { path: /var/lib/rancher/rke2/audit, mode: "0750" }
+
+- name: Check whether RKE2 is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/rke2
+  register: rke2_binary
+
+- name: Read the installed RKE2 version
+  ansible.builtin.command: /usr/local/bin/rke2 --version
+  register: installed_rke2_version
+  changed_when: false
+  when: rke2_binary.stat.exists
+
+- name: Decide whether the pinned release must be installed
+  ansible.builtin.set_fact:
+    rke2_install_required: "{{ not rke2_binary.stat.exists or lab_rke2_version not in (installed_rke2_version.stdout | default('')) }}"
+
+- name: Refuse an unplanned change to an installed RKE2 version
+  ansible.builtin.assert:
+    that:
+      - rke2_allow_version_change | default(false) | bool
+    fail_msg: Use the reviewed serial upgrade play rather than the bootstrap play for an existing node.
+  when:
+    - rke2_binary.stat.exists
+    - rke2_install_required
+
+- name: Download the pinned RKE2 release with checksum verification
+  ansible.builtin.get_url:
+    url: "{{ rke2_release_base }}/{{ rke2_tarball }}"
+    dest: "{{ rke2_download_dir }}/{{ rke2_tarball }}"
+    checksum: "sha256:{{ rke2_release_base }}/sha256sum-amd64.txt"
+    mode: "0644"
+    timeout: 120
+  when: rke2_install_required
+  register: rke2_download
+
+- name: Stop an existing RKE2 service before replacing its release
+  ansible.builtin.systemd:
+    name: "{{ 'rke2-server' if inventory_hostname in groups['rke2_servers'] else 'rke2-agent' }}"
+    state: stopped
+  when:
+    - rke2_binary.stat.exists
+    - rke2_install_required
+
+- name: Extract the release into /usr/local
+  ansible.builtin.unarchive:
+    src: "{{ rke2_download_dir }}/{{ rke2_tarball }}"
+    dest: /usr/local
+    remote_src: true
+    extra_opts:
+      - --no-same-owner
+  when: rke2_install_required
+
+- name: Install systemd units
+  ansible.builtin.copy:
+    src: "/usr/local/lib/systemd/system/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - rke2-server.service
+    - rke2-server.env
+    - rke2-agent.service
+    - rke2-agent.env
+  notify: reload systemd
+
+- name: Create client symlinks for kubectl and crictl
+  ansible.builtin.file:
+    src: "/var/lib/rancher/rke2/bin/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+    follow: false
+  loop:
+    - kubectl
+    - crictl
+
+- name: Check preloaded image archives
+  ansible.builtin.stat:
+    path: "/var/lib/rancher/rke2/agent/images/{{ item }}"
+  loop: "{{ rke2_image_tarballs }}"
+  register: rke2_images
+  when: rke2_preload_images
+
+- name: Download preloaded image archives
+  ansible.builtin.get_url:
+    url: "{{ rke2_release_base }}/{{ item.item }}"
+    dest: "/var/lib/rancher/rke2/agent/images/{{ item.item }}"
+    checksum: "sha256:{{ rke2_release_base }}/sha256sum-amd64.txt"
+    owner: root
+    group: root
+    mode: "0640"
+    timeout: 180
+  loop: "{{ rke2_images.results }}"
+  when:
+    - rke2_preload_images
+    - rke2_install_required or not item.stat.exists
+  register: rke2_image_download
+
+- name: Confirm the installed binary matches the pinned version
+  ansible.builtin.command: /usr/local/bin/rke2 --version
+  register: rke2_version_check
+  changed_when: false
+  failed_when: lab_rke2_version not in rke2_version_check.stdout

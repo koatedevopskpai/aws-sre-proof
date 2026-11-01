@@ -1,0 +1,10 @@
+---
+- name: Baseline every Ubuntu host
+  hosts: bastion:rke2_servers:rke2_agents
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: host_baseline
+      vars:
+        ssh_allow_tcp_forwarding: "{{ 'yes' if inventory_hostname in groups['bastion'] else 'no' }}"

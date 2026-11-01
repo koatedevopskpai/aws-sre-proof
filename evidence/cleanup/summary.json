@@ -1,0 +1,12 @@
+{
+  "status": "INDEPENDENTLY_VERIFIED",
+  "scope": "Historical lab only; unrelated retained resources excluded",
+  "managed_resources_destroyed": 96,
+  "managed_state_empty": true,
+  "inventory_categories": {
+    "earlier_audit": 28,
+    "final_audit": 21
+  },
+  "billing_reconciled": false,
+  "provenance": "Private independent inventory and verification report; original source hashes in provenance manifest"
+}

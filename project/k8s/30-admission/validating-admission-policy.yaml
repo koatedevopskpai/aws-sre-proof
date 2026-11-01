@@ -1,0 +1,165 @@
+# ---------------------------------------------------------------------------
+# Native admission policy (ValidatingAdmissionPolicy, CEL). No webhook, no
+# extra control-plane pods, no fail-open dependency.
+#
+# Pod Security Admission already enforces privileged/host-namespace/non-root/
+# seccomp for the tenant namespaces. These policies add the controls PSA
+# cannot express: registry provenance, digest pinning, resource limits, a
+# read-only root filesystem and ownership labels.
+#
+# Scope is the namespace label platform.lab/tier=tenant, so platform agents
+# are not affected.
+# ---------------------------------------------------------------------------
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-image-provenance
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        platform.lab/tier: tenant
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        object.spec.containers.all(container,
+          container.image.startsWith('123456789012.dkr.ecr.us-east-1.amazonaws.com/galland-rke2-use1/') &&
+          container.image.contains('@sha256:'))
+      message: "Images must come from the galland-rke2-use1 ECR repository and be pinned by sha256 digest."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-image-provenance
+spec:
+  policyName: tenant-image-provenance
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-resource-limits
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        platform.lab/tier: tenant
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        object.spec.containers.all(container,
+          has(container.resources) &&
+          has(container.resources.limits) &&
+          'cpu' in container.resources.limits &&
+          'memory' in container.resources.limits)
+      message: "Every container must set CPU and memory limits."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-resource-limits
+spec:
+  policyName: tenant-resource-limits
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-readonly-rootfs
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        platform.lab/tier: tenant
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        object.spec.containers.all(container,
+          has(container.securityContext) &&
+          has(container.securityContext.readOnlyRootFilesystem) &&
+          container.securityContext.readOnlyRootFilesystem)
+      message: "The container root filesystem must be read-only; mount emptyDir for writable paths."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-readonly-rootfs
+spec:
+  policyName: tenant-readonly-rootfs
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-ownership-labels
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        platform.lab/tier: tenant
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        has(object.metadata.labels) &&
+        'app.kubernetes.io/part-of' in object.metadata.labels
+      message: "Workloads must carry app.kubernetes.io/part-of."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-ownership-labels
+spec:
+  policyName: tenant-ownership-labels
+  validationActions: [Deny]
+---
+# Audit-only: probes are recorded in the API audit stream and surfaced by the
+# log-based metric rather than blocking a deployment.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-probes-audit
+spec:
+  failurePolicy: Ignore
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        platform.lab/team: platform-lab
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        object.spec.containers.all(container,
+          has(container.livenessProbe) && has(container.readinessProbe))
+      message: "Production workload containers should define liveness and readiness probes."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-probes-audit
+spec:
+  policyName: tenant-probes-audit
+  validationActions: [Audit]
+

@@ -1,0 +1,156 @@
+---
+- name: Collect host-level verification from control-plane nodes
+  hosts: rke2_servers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Collect host facts
+      ansible.builtin.shell: |
+        set -e
+        echo "hostname=$(hostname)"
+        echo "kernel=$(uname -r)"
+        echo "rke2=$(/usr/local/bin/rke2 --version | head -1)"
+        echo "rke2_service=$(systemctl is-active rke2-server)"
+        echo "chrony=$(chronyc tracking | awk -F': ' '/Leap status/ {print $2}')"
+        echo "audit_rules=$(auditctl -l | wc -l)"
+        echo "sysctl_overcommit=$(sysctl -n vm.overcommit_memory)"
+        echo "sysctl_panic=$(sysctl -n kernel.panic)"
+        echo "firewall_drop_counter=$(nft list chain inet platform_filter input | grep -c 'counter drop' || true)"
+      register: host_facts
+      changed_when: false
+
+    - name: Write control-plane host facts to the evidence pack
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/../../evidence/00-cluster/{{ inventory_hostname }}-host.txt"
+        content: "{{ host_facts.stdout }}\n"
+        mode: "0644"
+      become: false
+      delegate_to: localhost
+
+    - name: Assert the host is running the expected kernel protections
+      ansible.builtin.assert:
+        that:
+          - "'rke2_service=active' in host_facts.stdout"
+          - "'sysctl_overcommit=1' in host_facts.stdout"
+          - "'sysctl_panic=10' in host_facts.stdout"
+          - "'chrony=Normal' in host_facts.stdout"
+          - host_facts.stdout is search('audit_rules=[1-9]')
+        fail_msg: "Host baseline verification failed on {{ inventory_hostname }}:\n{{ host_facts.stdout }}"
+        quiet: true
+
+- name: Collect host-level verification from worker nodes
+  hosts: rke2_agents
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Collect worker facts
+      ansible.builtin.shell: |
+        set -e
+        echo "hostname=$(hostname)"
+        echo "kernel=$(uname -r)"
+        echo "rke2=$(/usr/local/bin/rke2 --version | head -1)"
+        echo "rke2_service=$(systemctl is-active rke2-agent)"
+        echo "chrony=$(chronyc tracking | awk -F': ' '/Leap status/ {print $2}')"
+        echo "audit_rules=$(auditctl -l | wc -l)"
+      register: worker_facts
+      changed_when: false
+
+    - name: Write worker facts to the evidence pack
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/../../evidence/00-cluster/{{ inventory_hostname }}-host.txt"
+        content: "{{ worker_facts.stdout }}\n"
+        mode: "0644"
+      become: false
+      delegate_to: localhost
+
+    - name: Assert worker services are healthy
+      ansible.builtin.assert:
+        that:
+          - "'rke2_service=active' in worker_facts.stdout"
+          - "'chrony=Normal' in worker_facts.stdout"
+        fail_msg: "Worker verification failed on {{ inventory_hostname }}:\n{{ worker_facts.stdout }}"
+        quiet: true
+
+- name: Verify cluster state and fetch the admin kubeconfig
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Take a baseline etcd snapshot
+      ansible.builtin.command:
+        cmd: /usr/local/bin/rke2 etcd-snapshot save --name post-install
+      changed_when: true
+
+    - name: Collect cluster state
+      ansible.builtin.shell: |
+        set -e
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        K=/var/lib/rancher/rke2/bin/kubectl
+        echo "=== nodes ==="
+        $K get nodes -o wide
+        echo "=== structured node readiness ==="
+        $K get nodes -o json | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=set(sys.argv[1:]); nodes={n["metadata"]["name"]:n for n in d["items"]}; assert set(nodes)==expected, "Unexpected node inventory"; assert all(any(c["type"]=="Ready" and c["status"]=="True" for c in n["status"]["conditions"]) for n in nodes.values()), "A node is not Ready"; print("EXPECTED_NODES_READY")' {{ (groups['rke2_servers'] + groups['rke2_agents']) | map('quote') | join(' ') }}
+        echo "=== etcd health ==="
+        $K get --raw /healthz/etcd
+        echo
+        echo "=== readyz ==="
+        $K get --raw '/readyz?verbose' | tail -5
+        echo "=== system pods ==="
+        $K -n kube-system get pods -o wide
+        echo "=== cilium ==="
+        $K -n kube-system get ds cilium -o wide
+        echo "=== secrets encryption ==="
+        /usr/local/bin/rke2 secrets-encrypt status
+        echo "=== etcd snapshots ==="
+        /usr/local/bin/rke2 etcd-snapshot list
+        echo "=== audit log ==="
+        ls -lh /var/lib/rancher/rke2/server/logs/audit.log
+        echo "=== certificates ==="
+        ls -l /var/lib/rancher/rke2/server/tls/*.crt | head -20
+      register: cluster_state
+      changed_when: false
+
+    - name: Write cluster state to the evidence pack
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/../../evidence/00-cluster/cluster-state.txt"
+        content: "{{ cluster_state.stdout }}\n"
+        mode: "0644"
+      become: false
+      delegate_to: localhost
+
+    - name: Assert the expected cluster shape
+      ansible.builtin.assert:
+        that:
+          - "'EXPECTED_NODES_READY' in cluster_state.stdout"
+          - cluster_state.rc == 0
+        fail_msg: "Cluster verification failed. See evidence/00-cluster/cluster-state.txt"
+        quiet: true
+
+    - name: Ensure the controller kubeconfig directory exists
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.kube"
+        state: directory
+        mode: "0700"
+      become: false
+      delegate_to: localhost
+
+    - name: Read the admin kubeconfig
+      ansible.builtin.slurp:
+        src: /etc/rancher/rke2/rke2.yaml
+      register: admin_kubeconfig
+
+    - name: Write a kubeconfig that points at the load-balanced API endpoint
+      ansible.builtin.copy:
+        dest: "{{ lookup('env', 'HOME') }}/.kube/platform-lab.yaml"
+        content: >-
+          {{ admin_kubeconfig.content | b64decode
+             | replace('https://127.0.0.1:6443', lab_api_endpoint) }}
+        mode: "0600"
+        backup: true
+      become: false
+      delegate_to: localhost
+
+

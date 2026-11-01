@@ -1,0 +1,102 @@
+# ---------------------------------------------------------------------------
+# Three identities with deliberately different powers:
+#
+#   probe               no API permissions at all (token not mounted)
+#   ci-deployer         can deploy workloads in tenant-probe, cannot read
+#                       Secrets and cannot touch RBAC
+#   platform-audit-reader  can inspect cluster state, cannot read Secrets
+#
+# The negative tests in exercises/ rely on these boundaries.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: probe
+  namespace: tenant-probe
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-deployer
+  namespace: tenant-probe
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-deployer
+  namespace: tenant-probe
+rules:
+  - apiGroups: ["", "apps", "batch"]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - deployments
+      - replicasets
+      - statefulsets
+      - jobs
+      - cronjobs
+      - configmaps
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # No secrets, no serviceaccounts, no rolebindings, no delete on workloads.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-deployer
+  namespace: tenant-probe
+subjects:
+  - kind: ServiceAccount
+    name: ci-deployer
+    namespace: tenant-probe
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-deployer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform-audit-reader
+  namespace: platform-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-audit-reader
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "nodes", "namespaces", "services", "endpoints", "events", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  # Deliberately absent: secrets, configmaps, serviceaccounts, rbac, pods/exec.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-audit-reader
+subjects:
+  - kind: ServiceAccount
+    name: platform-audit-reader
+    namespace: platform-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-audit-reader
