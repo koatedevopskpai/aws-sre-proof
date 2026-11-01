@@ -1,5 +1,6 @@
 {
   "prepared_utc": "2026-10-31T20:35:00Z",
+  "updated_utc": "2026-11-01",
   "originals": "Private, outside this repository",
   "public_directory": "docs/capture/images/redacted",
   "captures": [
@@ -15,41 +16,8 @@
         1008
       ],
       "redaction_method": "Cropped white canvas. Black boxes over account/user menu and the unrelated instance name and ID. Retained region text, instance table, stopped state and availability zone.",
-      "claim_scope": "Visible us-east-1 EC2 inventory only: one unrelated stopped PulseNotify instance, no Galland instances. Not a full multi-service cleanup proof.",
-      "caption": "Post-cleanup EC2 view, us-east-1, 31 October 2026 20:02 UTC. The only visible instance is the unrelated stopped PulseNotify server; no Galland lab instances are present. Account and instance identifiers are redacted. This supports visible EC2 cleanup only, not the independent multi-service inventory audit."
-    },
-    {
-      "id": "02-readme-results",
-      "original_file": "02-readme-results.png",
-      "original_captured_utc": "2026-10-31T20:28:27.718705+00:00",
-      "redacted_file": "redacted/02-readme-results-redacted.png",
-      "redacted_sha256": "f8054732a905b09d048e22bf7c8c10deb3acf822eb2e2f7e80bab50177521b4d",
-      "redacted_dimensions": [
-        1253,
-        703
-      ],
-      "source_file": "README.md",
-      "redaction_method": "Cropped top 115 px to remove VS Code tabs, breadcrumb/local username path and an unrelated tab title. No content altered.",
-      "claim_scope": "Measured S0\u2013S7 results and independent-lab qualifications.",
-      "caption": "Measured S0\u2013S7 results from the Galland AWS SRE proof. Synthetic bounded lab; not a production SLO, zero-downtime guarantee or commercial ownership claim.",
-      "source_sha256_at_capture": "c2723d999597e8caf7adf40dc277bb62c1b22a315a2640bef21a6d1ef3f68dc2",
-      "source_note": "Historical README capture. The landing-page wording and structure were refined on 1 November 2026; the measured figures in the S0–S7 table shown are unchanged. Capture-time source hash is preserved."
-    },
-    {
-      "id": "03-claim-ledger",
-      "original_file": "03-claim-ledger.png",
-      "original_captured_utc": "2026-10-31T20:28:44.753828+00:00",
-      "redacted_file": "redacted/03-claim-ledger-redacted.png",
-      "redacted_sha256": "158be3c264959d303790c4a0ce2891d9f758367180124ea0dcd5a3a097d1550b",
-      "redacted_dimensions": [
-        1253,
-        703
-      ],
-      "source_file": "CLAIM-LEDGER.json",
-      "redaction_method": "Cropped top 115 px to remove VS Code tabs, breadcrumb/local username path and an unrelated tab title. No content altered.",
-      "claim_scope": "Top of the claim ledger: S0\u2013S4 claims and qualifications; not the complete ledger.",
-      "caption": "Top of the claim ledger showing measured claims and qualifications. The screenshot is partial; the full ledger is in CLAIM-LEDGER.json.",
-      "source_sha256_at_capture": "63d34fc5d1ffaf14b5c9653c0bb048ed1229da025343703a849627a20a9f2105"
+      "claim_scope": "Visible us-east-1 EC2 inventory only: one unrelated stopped PulseNotify instance, no lab instances. Not a full multi-service cleanup proof.",
+      "caption": "Post-cleanup EC2 view, us-east-1, 31 October 2026 20:02 UTC. The only visible instance is the unrelated stopped PulseNotify server; no lab instances are present. Account and instance identifiers are redacted. This supports visible EC2 cleanup only, not the independent multi-service inventory audit."
     },
     {
       "id": "04-local-checks",
@@ -67,29 +35,19 @@
       "caption": "Real local checks captured 31 October 2026: 13/13 AWS SRE tests, 14/14 Bedrock tests and Terraform validation pass. Retrospective report from saved output, not a live cloud run.",
       "source_sha256_at_capture": "22386a1a8489434c266c3f8e208c177e54e0fc2c3da3a58c5ced84cdc3655eb0",
       "source_note": "Historical capture. The source page has since gained a note that its recorded revision predates the cleaned public history; the displayed results are unchanged."
-    },
-    {
-      "id": "05-bedrock-local",
-      "original_file": "05-bedrock-local.png",
-      "original_captured_utc": "2026-10-31T20:29:05.799918+00:00",
-      "redacted_file": "redacted/05-bedrock-local-redacted.png",
-      "redacted_sha256": "c4dea3bbb5e3a3f91f1bab25c3abfb9ee2d5d04311bb5503a8885054507e6770",
-      "redacted_dimensions": [
-        1253,
-        703
-      ],
-      "source_file": "bedrock/local-implementation/README.md",
-      "redaction_method": "Cropped top 115 px to remove VS Code tabs, breadcrumb/local username path and an unrelated tab title. No content altered.",
-      "claim_scope": "Local Bedrock companion documentation, explicit no-live-deployment boundary and local-check results; not live Bedrock or AgentCore evidence.",
-      "caption": "Local Bedrock companion: CDK stack, knowledge base, scoped tools, MCP server and agent loop. Fourteen local tests and the TypeScript build pass; no live Bedrock deployment is claimed.",
-      "source_sha256_at_capture": "4d8636dfcd54a617331064d54cb0d5f4b4b5dfd4f9e3f45b301eb30a46e4889f",
-      "source_note": "Historical capture. The page has since been reworded to remove references to internal planning documents; the local-test results and no-live-deployment boundary shown are unchanged."
     }
   ],
+  "withdrawn_captures": {
+    "ids": [
+      "02-readme-results",
+      "03-claim-ledger",
+      "05-bedrock-local"
+    ],
+    "reason": "Withdrawn on 1 November 2026: they showed the former project name or a planning document that is no longer published. Originals and redacted copies are retained privately outside this repository."
+  },
   "limitations": [
     "The EC2 image proves only the visible regional EC2 table at capture time.",
-    "The VS Code images show documentation and saved records, not fresh command execution.",
-    "The local Bedrock images are code/local-test evidence only.",
+    "The local-checks image shows a saved documentation record, not fresh command execution.",
     "No live Kubernetes, Argo CD or Prometheus console capture exists after teardown."
   ],
   "capture_repository_revision": "42692102665c0b6342e82c46c27d9a3a1d837744",

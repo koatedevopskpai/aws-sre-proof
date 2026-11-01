@@ -1,4 +1,4 @@
-# Galland AWS SRE evidence — final session results
+# AWS SRE evidence — final session results
 
 31 October 2026. Run `20261031T151734Z-galland`, us-east-1. Independent synthetic lab; no commercial production or on-call-tenure claim.
 

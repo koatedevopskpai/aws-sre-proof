@@ -1,5 +1,5 @@
 {
-  "project": "Galland AWS SRE Proof",
+  "project": "AWS SRE Proof",
   "run_id": "20261031T151734Z-galland",
   "s1_run_id": "20261031T031410Z-phase1",
   "note": "Selected sanitised evidence. Private raw records, state, keys and full inventories are withheld.",
@@ -26,8 +26,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "182ad26bfaa092111ca2154475a4355354e36c9c92fd73d4d8472eccc1b6ec74",
-      "bytes": 3976
+      "sha256": "300ace48dbcceee464166af1cd3bba6948fa70fa7e40165a841d180f1cb5c5be",
+      "bytes": 3858
     },
     {
       "path": "runtime-excerpts/README.md",

@@ -32,12 +32,11 @@ Reviewed, redacted screenshots are indexed separately in [`../docs/capture/image
 | Image | Supports | Limit |
 |---|---|---|
 | `docs/capture/images/redacted/01-ec2-post-cleanup-redacted.png` | S7 visible EC2 cleanup | Regional table only; not the multi-service inventory |
-| `docs/capture/images/redacted/02-readme-results-redacted.png` | S0–S7 summary | Documentation view, not runtime proof |
-| `docs/capture/images/redacted/03-claim-ledger-redacted.png` | S0–S4 claims | Partial ledger view |
 | `docs/capture/images/redacted/04-local-checks-redacted.png` | Local test/build results | Retrospective report, not a live run |
-| `docs/capture/images/redacted/05-bedrock-local-redacted.png` | Local Bedrock code | Local only; no Bedrock/AgentCore live evidence |
 
-Untouched originals remain private. The EC2 account/user menu and unrelated instance identifiers were removed from the public copy; local VS Code chrome, local username path and an unrelated tab title were cropped from the local images.
+Three further documentation captures were withdrawn on 1 November 2026 because they showed the former project name or a planning document that is no longer published. The manifest records the withdrawal; the files are retained privately.
+
+Untouched originals remain private. The EC2 account/user menu and unrelated instance identifiers were removed from the public copy; local VS Code chrome, local username path and an unrelated tab title were cropped from the local-check image.
 
 ## Integrity
 

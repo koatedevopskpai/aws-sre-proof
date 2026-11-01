@@ -2,7 +2,7 @@
 
 **Status: local-only. No live Bedrock or AgentCore deployment. No cloud evidence.**
 
-This is a separate Bedrock implementation, included to show code-level competency alongside the measured AWS SRE lab. It is not part of the Galland SRE run and must not be presented as live Bedrock delivery.
+This is a separate Bedrock implementation, included to show code-level competency alongside the measured AWS SRE lab. It is not part of the AWS SRE run and must not be presented as live Bedrock delivery.
 
 ## What it contains
 

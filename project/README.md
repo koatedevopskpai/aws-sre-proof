@@ -1,6 +1,6 @@
 # Execution source
 
-This is the source actually used for the measured Galland AWS SRE lab. It is preserved separately from the private runtime records, Terraform state, plans, keys and kubeconfigs.
+This is the source actually used for the measured AWS SRE lab. It is preserved separately from the private runtime records, Terraform state, plans, keys and kubeconfigs.
 
 - Terraform creates the us-east-1 VPC, subnets, NAT, NLB, Route 53, IAM, S3, ECR, CloudWatch, CloudTrail, budget, Lambda and scheduler resources.
 - Ansible performs the Ubuntu/RKE2 baseline and lifecycle operations.

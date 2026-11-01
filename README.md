@@ -1,4 +1,4 @@
-# Galland AWS SRE Proof
+# AWS SRE Proof
 
 This project demonstrates how a seven-node Kubernetes platform on AWS behaves during maintenance, failed releases and application faults. Terraform and Ansible provisioned the environment; recorded exercises covered node replacement, a patch upgrade, API leaf-certificate rotation, GitOps recovery and alert delivery. Selected sanitised evidence and reproducible source are included.
 
@@ -39,6 +39,8 @@ Read [`docs/RESULTS.md`](docs/RESULTS.md), [`CLAIM-LEDGER.json`](CLAIM-LEDGER.js
 The [evidence index](evidence/README.md) maps claims to selected runtime excerpts, worker observations, cleanup summaries and reviewed screenshots. The [screenshot manifest](docs/capture/images/MANIFEST.json) records provenance and scope; documentation screenshots show saved records, not live runtime behaviour.
 
 These are bounded lab results, not production-scale operation, a monthly SLO or commercial on-call experience. The upgrade has before/after health checks rather than a continuous-availability measurement. Raw private records, credentials, state and account-specific inventories are withheld. Read the [limitations](docs/LIMITATIONS.md) alongside the results. The probe image's recorded scan includes unresolved HIGH findings; no production-ready or vulnerability-free claim is made.
+
+**Recorded identifiers:** run IDs and the resource tag used during the exercises retain the original lab prefix. They identify this independent lab; no client code or client environment is included.
 
 ## AgentCore extension — local implementation
 
