@@ -2,7 +2,7 @@
 
 This project demonstrates how a seven-node Kubernetes platform on AWS behaves during maintenance, failed releases and application faults. Terraform and Ansible provisioned the environment; recorded exercises covered node replacement, a patch upgrade, API leaf-certificate rotation, GitOps recovery and alert delivery. Selected sanitised evidence and reproducible source are included.
 
-**Phase 1:** the independent synthetic lab ran live in `us-east-1` and was torn down with cleanup verification. The final run was `20261031T151734Z-galland`; the worker-replacement measurement comes from an earlier run. Unrelated account resources and the retained Terraform backend were excluded from teardown. Final billing is not yet reconciled.
+**Phase 1:** the independent synthetic lab ran live in `us-east-1` and was torn down with cleanup verification. The final run was `20261031T151734Z-galland`; the worker-replacement measurement comes from an earlier run. Unrelated account resources and the retained Terraform backend were excluded from teardown. Billing is only partly reconciled (final-run day only; see [the billing check](evidence/billing-2026-11-20.md)).
 
 **AgentCore extension:** implemented and tested locally. Its model-backed live demonstration is blocked because AWS declined the selected Nova 2 Lite cross-region quota request in `us-west-2`. That decision is not a blanket denial of Bedrock or AgentCore access. No live AgentCore deployment or invocation is claimed. See [access status](bedrock/ACCESS-STATUS.md).
 
@@ -72,6 +72,6 @@ The Kubernetes image references use a documented sample account and an explicit 
 
 ## Cost and cleanup
 
-The final Phase 1 session was planned at USD 4–8 with a USD 15 operating allowance. These are planning figures; final charges have not been reconciled and the allowance was not a hard cap. Earlier sessions have separate runtime and costs.
+The final Phase 1 session was planned at USD 4–8 with a USD 15 operating allowance. These are planning figures. Cost Explorer (checked 20 Nov 2026) shows USD 5.44 of account usage on the final-run day, 31 Oct, fully offset by credits (USD 0 net); about USD 5.30 of that is above the account's unrelated baseline, inside the planned range. This is a partial reconciliation: spend is not attributed by tag and earlier sessions are not covered ([evidence](evidence/billing-2026-11-20.md)). The allowance was not a hard cap. Earlier sessions have separate runtime and costs.
 
 The compute expiry guard terminates tagged instances only. Full cleanup also removes storage, networking and other lab resources, followed by a residual inventory check. The recorded cleanup preserved unrelated resources and the retained Terraform backend. See the [results](docs/RESULTS.md) and [cleanup evidence](evidence/README.md).
