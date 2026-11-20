@@ -57,9 +57,9 @@
     {
       "id": "S7_teardown_billing",
       "title": "Cleanup and residual inventory",
-      "status": "TEARDOWN_VERIFIED_BILLING_PENDING",
+      "status": "TEARDOWN_VERIFIED_BILLING_PARTLY_RECONCILED",
       "evidence": "96 managed resources destroyed; empty managed state; final 21-category audit passed; one extra Lambda log group removed; unrelated resources preserved",
-      "qualification": "Billing delayed and not reconciled; retained backend and unrelated account resources are exclusions"
+      "qualification": "Billing partly reconciled on 20 Nov 2026 (final-run day 31 Oct: usage USD 5.44 offset by credits, net USD 0; not attributed by tag; earlier runs not covered; see evidence/billing-2026-11-20.md); retained backend and unrelated account resources are exclusions"
     },
     {
       "id": "BEDROCK_LOCAL_IMPLEMENTATION",

@@ -21,4 +21,4 @@ The upgrade's external NodePort observer preflight failed, so it has before/afte
 
 Argo's source and anonymous read-only UI were private to the lab; source authentication/TLS and external Git hosting were not demonstrated. The unhealthy rollout could leave old replicas serving; Degraded does not prove user outage. Alerts reached an in-cluster receiver and CloudWatch Logs, not a human page. The control-plane exercise is not simultaneous quorum loss or regional DR.
 
-The probe image scan still reported 4 HIGH / 9 MEDIUM / 3 LOW. No production-ready or vulnerability-free claim. Prometheus was single-instance. Billing has not reconciled: USD 4–8 was an estimate, USD 15 an operating allowance, not a hard cap. Phase 2A is local-only; live AgentCore remains NOT RUN.
+The probe image scan still reported 4 HIGH / 9 MEDIUM / 3 LOW. No production-ready or vulnerability-free claim. Prometheus was single-instance. Billing is only partly reconciled (final-run day only; see evidence/billing-2026-11-20.md): USD 4–8 was an estimate, USD 15 an operating allowance, not a hard cap. Phase 2A is local-only; live AgentCore remains NOT RUN.

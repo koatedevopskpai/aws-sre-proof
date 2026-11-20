@@ -12,7 +12,7 @@ This is a bounded synthetic lab. The following limits travel with every result.
 - S2 is a single non-bootstrap server replacement. It is not simultaneous quorum loss or regional disaster recovery.
 - The probe image scan reported **4 HIGH / 9 MEDIUM / 3 LOW**. No vulnerability-free or production-ready claim.
 - Prometheus was single-instance and was relocated during maintenance. No uninterrupted-Prometheus claim.
-- Billing is not reconciled. The USD 4–8 estimate and USD 15 allowance are planning figures, not a hard cap or an actual bill. Cost Explorer lag means a zero/pending reading is not proof of zero cost.
+- Billing is only partly reconciled. On 20 Nov 2026 Cost Explorer showed USD 5.44 of account usage on the final-run day (31 Oct), fully offset by credits (USD 0 net); roughly USD 5.30 of it is above an unrelated baseline of about USD 0.14 per day. Spend is not attributed by tag (cost-allocation tags were not active) and earlier sessions are not covered. The USD 4–8 estimate and USD 15 allowance are planning figures, not a hard cap or an invoice. Credits mean the cash cost was USD 0 even though the usage was not. See [evidence/billing-2026-11-20.md](../evidence/billing-2026-11-20.md).
 - The cleanup audit is a selected summary in this repository. The full private inventory is withheld; this summary does not independently reproduce the account-side audit.
 
 ## Scale and scope boundaries

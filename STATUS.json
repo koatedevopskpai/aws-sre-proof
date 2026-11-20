@@ -9,6 +9,19 @@
   "cleanup_verified": true,
   "cleanup_checked_utc": "2026-10-31T17:56:34.885421+00:00",
   "billing_reconciled": false,
+  "billing_reconciliation": {
+    "status": "PARTIAL_FINAL_RUN_DAY_ONLY",
+    "checked_utc": "2026-11-20",
+    "final_run_day": "2026-10-31",
+    "usage_usd": 5.44,
+    "credits_usd": -5.44,
+    "net_usd": 0.0,
+    "unrelated_baseline_usd_per_day": 0.14,
+    "estimated_lab_increment_usd": 5.3,
+    "attributed_by_tag": false,
+    "earlier_runs_covered": false,
+    "evidence": "evidence/billing-2026-11-20.md"
+  },
   "sre_exercises": {
     "S0_baseline": "DEMONSTRATED",
     "S1_worker_replacement": "DEMONSTRATED_IN_EARLIER_RUN_600_REQUEST_WINDOW",
@@ -17,7 +30,7 @@
     "S4_leaf_rotation": "DEMONSTRATED_ONE_API_LEAF",
     "S5_gitops": "DEMONSTRATED_LAB_LOCAL_GIT",
     "S6_reliability_alert": "DEMONSTRATED_IN_CLUSTER_AND_CLOUDWATCH_LOGS",
-    "S7_teardown_billing": "TEARDOWN_VERIFIED_BILLING_PENDING"
+    "S7_teardown_billing": "TEARDOWN_VERIFIED_BILLING_PARTLY_RECONCILED"
   },
   "bedrock": {
     "status": "LOCAL_IMPLEMENTATION_VERIFIED_LIVE_NOT_RUN",
@@ -60,6 +73,6 @@
   },
   "next_actions": [
     "Live Bedrock/AgentCore remains unproven; a live AgentCore session needs verified model access, a bounded evidence plan and a cleanup owner",
-    "Reconcile delayed AWS billing; do not treat a zero/pending reading as zero cost"
+    "Finish billing reconciliation: activate cost-allocation tags to attribute spend, cover the earlier sessions, and re-check 1-2 Nov once final; credits mean cash cost was USD 0 even though usage was not"
   ]
 }
